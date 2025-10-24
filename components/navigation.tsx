@@ -18,13 +18,24 @@ export function Navigation() {
     const checkResults = () => {
       if (typeof window !== "undefined") {
         const currentAnalysis = sessionStorage.getItem("current_analysis")
-        setHasResults(!!currentAnalysis)
+        const isAnalyzing = sessionStorage.getItem("is_analyzing") === "true"
+        setHasResults(!!currentAnalysis || isAnalyzing)
       }
     }
 
     checkResults()
-    const interval = setInterval(checkResults, 500)
-    return () => clearInterval(interval)
+    
+    // Listen for storage changes
+    const handleStorageChange = () => checkResults()
+    window.addEventListener('storage', handleStorageChange)
+    
+    // Also check more frequently during transitions
+    const interval = setInterval(checkResults, 200)
+    
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('storage', handleStorageChange)
+    }
   }, [pathname])
 
   useEffect(() => {

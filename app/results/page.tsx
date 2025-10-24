@@ -35,14 +35,34 @@ export default function ResultsPage() {
   const [isAnalyzingAI, setIsAnalyzingAI] = useState(false)
   const [teacherScript, setTeacherScript] = useState("")
   const [copiedScript, setCopiedScript] = useState(false)
+  const [result, setResult] = useState<any>(null)
 
-  // Mock data - in real app, this would come from props or state management
-  const mockResult = {
+  // Load analysis result from sessionStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const storedResult = sessionStorage.getItem("current_analysis")
+      if (storedResult) {
+        try {
+          const parsedResult = JSON.parse(storedResult)
+          setResult(parsedResult)
+        } catch (error) {
+          console.error("Failed to parse analysis result:", error)
+          router.push("/")
+        }
+      } else {
+        // No analysis result, redirect to home
+        router.push("/")
+      }
+    }
+  }, [router])
+
+  // Fallback mock data in case of missing data
+  const displayResult = result || {
     overallScore: 88,
     strengths: [
-      "AI 및 데이터 분석 관련 탐구 활동이 구체적이고 심층적임.",
-      "수학 세특에서 문제 해결 과정과 사고력이 명확히 드러남.",
-      "창의적 체험활동에서 리더십과 협업 역량이 우수함.",
+      { title: "AI 및 데이터 분석 관련 탐구 활동", description: "구체적이고 심층적임" },
+      { title: "수학 세특", description: "문제 해결 과정과 사고력이 명확히 드러남" },
+      { title: "창의적 체험활동", description: "리더십과 협업 역량이 우수함" },
     ],
     improvements: [
       "진로 희망 대비 전공 적합성을 보완할 추가 활동 필요.",
@@ -51,33 +71,39 @@ export default function ResultsPage() {
     ],
     errors: [
       {
-        type: "금지" as const,
+        id: "1",
+        title: "대학명 직접 명시",
         content: "○○대학교 AI 캠프 참여",
-        reason: "대학명 직접 명시 금지 (교육부 훈령 제530호)",
-        page: 1,
+        severity: "high" as const,
+        description: "대학명 직접 명시 금지 (교육부 훈령 제530호)",
+        location: "1페이지",
         suggestion: "대학 주관 프로그램 → 교육기관 주관 프로그램으로 수정",
-      },
-      {
-        type: "주의" as const,
-        content: "매사에 성실하고 적극적이며 앞으로가 기대됨",
-        reason: "모호한 칭찬 표현 (구체적 근거 부족)",
-        page: 2,
-        suggestion: "구체적인 활동 사례와 관찰 근거를 포함하여 재작성",
-      },
-      {
-        type: "금지" as const,
-        content: "TOEIC 900점 취득",
-        reason: "공인어학시험 점수 기재 금지",
-        page: 3,
-        suggestion: "영어 의사소통 능력 향상을 위한 자기주도적 학습 수행으로 수정",
+        category: "기관명",
       },
     ],
     suggestions: [
       "수학 세특: '데이터 분석' 키워드를 활용한 심화 탐구 추가 권장.",
       "과학 세특: AI 윤리 관련 탐구로 진로 연계성 강화.",
-      "동아리 활동: 구체적인 역할과 성과를 명확히 기술.",
-      "독서 활동: 전공 관련 도서 추가로 진로 탐색 깊이 강화.",
     ],
+  }
+
+  // Transform data for backward compatibility
+  const displayResult = {
+    overallScore: displayResult.overallScore,
+    strengths: Array.isArray(displayResult.strengths) 
+      ? displayResult.strengths.map((s: any) => typeof s === 'string' ? s : `${s.title}: ${s.description}`)
+      : [],
+    improvements: displayResult.improvements || [],
+    errors: (displayResult.errors || []).map((e: any) => ({
+      type: e.severity === 'high' ? '금지' as const : '주의' as const,
+      content: e.content || e.location,
+      reason: e.description,
+      page: typeof e.location === 'string' && e.location.includes('페이지') 
+        ? parseInt(e.location) || 1 
+        : 1,
+      suggestion: e.suggestion,
+    })),
+    suggestions: displayResult.suggestions || displayResult.recommendations?.map((r: any) => r.item) || [],
   }
 
   const runAIKillerAnalysis = async () => {
@@ -132,8 +158,8 @@ export default function ResultsPage() {
   }
 
   const generateTeacherScript = () => {
-    const errors = mockResult.errors
-    const improvements = mockResult.improvements
+    const errors = displayResult.errors
+    const improvements = displayResult.improvements
 
     let script = "선생님, 생기부 AI 분석 결과를 확인했는데 몇 가지 수정이 필요한 부분이 있어서 말씀드립니다.\n\n"
 
@@ -198,24 +224,16 @@ export default function ResultsPage() {
     }
   }
 
+  // Maintain analyzing state while on results page
   useEffect(() => {
     if (typeof window !== "undefined") {
       sessionStorage.setItem("is_analyzing", "true")
-    }
-
-    return () => {
-      if (typeof window !== "undefined") {
-        const currentAnalysis = sessionStorage.getItem("current_analysis")
-        if (currentAnalysis) {
-          sessionStorage.setItem("is_analyzing", "true")
-        }
-      }
     }
   }, [])
 
   const handleShare = async () => {
     const resultUrl = window.location.href
-    const shareText = `생기부 AI 분석 결과\n\n종합 평가: ${mockResult.overallScore}점\n\n강점:\n${mockResult.strengths.map((s, i) => `${i + 1}. ${s}`).join("\n")}\n\n보완 필요:\n${mockResult.improvements.map((i, idx) => `${idx + 1}. ${i}`).join("\n")}`
+    const shareText = `생기부 AI 분석 결과\n\n종합 평가: ${displayResult.overallScore}점\n\n강점:\n${displayResult.strengths.map((s, i) => `${i + 1}. ${s}`).join("\n")}\n\n보완 필요:\n${displayResult.improvements.map((i, idx) => `${idx + 1}. ${i}`).join("\n")}`
 
     if (navigator.share) {
       try {
@@ -242,19 +260,19 @@ export default function ResultsPage() {
     const report = `생기부 AI 분석 결과
 ===================
 
-종합 평가: ${mockResult.overallScore}점
+종합 평가: ${displayResult.overallScore}점
 
 강점:
-${mockResult.strengths.map((s, i) => `${i + 1}. ${s}`).join("\n")}
+${displayResult.strengths.map((s, i) => `${i + 1}. ${s}`).join("\n")}
 
 보완 사항:
-${mockResult.improvements.map((s, i) => `${i + 1}. ${s}`).join("\n")}
+${displayResult.improvements.map((s, i) => `${i + 1}. ${s}`).join("\n")}
 
-오류 ${mockResult.errors.length}건:
-${mockResult.errors.map((e, i) => `${i + 1}. [${e.type}] ${e.content}\n   사유: ${e.reason}`).join("\n")}
+오류 ${displayResult.errors.length}건:
+${displayResult.errors.map((e, i) => `${i + 1}. [${e.type}] ${e.content}\n   사유: ${e.reason}`).join("\n")}
 
 개선 제안:
-${mockResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
+${displayResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
     `.trim()
 
     const blob = new Blob([report], { type: "text/plain;charset=utf-8" })
@@ -282,7 +300,7 @@ ${mockResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
           >
             <Button
               variant="ghost"
-              onClick={() => router.push("/results")}
+              onClick={() => router.back()}
               className="rounded-full hover:bg-gray-100 h-9 px-4 text-sm"
             >
               <ArrowLeft className="w-4 h-4 mr-1.5" />
@@ -305,20 +323,20 @@ ${mockResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
           >
             <GlassCard className="p-8 sm:p-10 text-center" glow>
               <div className="space-y-3">
-                <div className="text-5xl sm:text-6xl font-bold text-black">{mockResult.overallScore}점</div>
+                <div className="text-5xl sm:text-6xl font-bold text-black">{displayResult.overallScore}점</div>
                 <p className="text-base sm:text-lg text-gray-600">종합 평가 점수 (상위 12%)</p>
                 <div className="flex items-center justify-center gap-4 sm:gap-6 pt-4">
                   <div className="flex items-center gap-1.5">
                     <CheckCircle2 className="w-4 h-4 text-green-600" />
-                    <span className="text-xs sm:text-sm text-gray-600">강점 {mockResult.strengths.length}개</span>
+                    <span className="text-xs sm:text-sm text-gray-600">강점 {displayResult.strengths.length}개</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <AlertCircle className="w-4 h-4 text-orange-600" />
-                    <span className="text-xs sm:text-sm text-gray-600">보완 {mockResult.improvements.length}개</span>
+                    <span className="text-xs sm:text-sm text-gray-600">보완 {displayResult.improvements.length}개</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <FileText className="w-4 h-4 text-red-600" />
-                    <span className="text-xs sm:text-sm text-gray-600">오류 {mockResult.errors.length}개</span>
+                    <span className="text-xs sm:text-sm text-gray-600">오류 {displayResult.errors.length}개</span>
                   </div>
                 </div>
               </div>
@@ -409,7 +427,7 @@ ${mockResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                     주요 강점
                   </h3>
                   <ul className="space-y-3">
-                    {mockResult.strengths.map((strength, idx) => (
+                    {displayResult.strengths.map((strength, idx) => (
                       <motion.li
                         key={idx}
                         initial={{ opacity: 0, x: -20 }}
@@ -429,7 +447,7 @@ ${mockResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                     보완 필요
                   </h3>
                   <ul className="space-y-3">
-                    {mockResult.improvements.map((improvement, idx) => (
+                    {displayResult.improvements.map((improvement, idx) => (
                       <motion.li
                         key={idx}
                         initial={{ opacity: 0, x: -20 }}
@@ -447,7 +465,7 @@ ${mockResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
 
             {activeTab === "errors" && (
               <div className="space-y-4">
-                {mockResult.errors.map((error, idx) => (
+                {displayResult.errors.map((error, idx) => (
                   <motion.div
                     key={idx}
                     initial={{ opacity: 0, y: 20 }}
@@ -493,7 +511,7 @@ ${mockResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                   AI 개선 제안
                 </h3>
                 <ul className="space-y-4">
-                  {mockResult.suggestions.map((suggestion, idx) => (
+                  {displayResult.suggestions.map((suggestion, idx) => (
                     <motion.li
                       key={idx}
                       initial={{ opacity: 0, x: -20 }}
