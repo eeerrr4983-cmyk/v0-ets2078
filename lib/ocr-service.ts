@@ -23,9 +23,27 @@ export async function extractTextFromImage(
   onProgress?: (progress: OCRProgress) => void,
 ): Promise<string> {
   try {
+    // Helper function to simulate smooth progress between checkpoints
+    const smoothProgress = async (start: number, end: number, duration: number, message: string) => {
+      const steps = 10
+      const increment = (end - start) / steps
+      const delay = duration / steps
+      
+      for (let i = 0; i <= steps; i++) {
+        onProgress?.({
+          status: 'processing',
+          progress: Math.min(end, start + (increment * i)),
+          message
+        })
+        if (i < steps) {
+          await new Promise(resolve => setTimeout(resolve, delay))
+        }
+      }
+    }
+
     onProgress?.({
       status: 'preparing',
-      progress: 10,
+      progress: 5,
       message: '이미지를 준비하는 중...'
     })
 
@@ -38,15 +56,18 @@ export async function extractTextFromImage(
     formData.append('scale', 'true')
     formData.append('OCREngine', '2')
 
+    await smoothProgress(5, 15, 300, '이미지를 준비하는 중...')
+
     onProgress?.({
       status: 'uploading',
-      progress: 30,
+      progress: 15,
       message: 'OCR 서버에 업로드 중...'
     })
 
     const apiKey = process.env.NEXT_PUBLIC_OCR_SPACE_API_KEY || 'K85664750088957'
     
-    const response = await fetch('https://api.ocr.space/parse/image', {
+    // Start upload with progress simulation
+    const uploadPromise = fetch('https://api.ocr.space/parse/image', {
       method: 'POST',
       headers: {
         'apikey': apiKey,
@@ -54,21 +75,29 @@ export async function extractTextFromImage(
       body: formData,
     })
 
-    onProgress?.({
-      status: 'processing',
-      progress: 60,
-      message: '텍스트를 추출하는 중...'
-    })
+    // Simulate upload progress
+    await smoothProgress(15, 40, 800, 'OCR 서버에 업로드 중...')
+
+    const response = await uploadPromise
 
     if (!response.ok) {
       throw new Error(`OCR API 오류: ${response.status}`)
     }
 
+    onProgress?.({
+      status: 'processing',
+      progress: 45,
+      message: '텍스트를 추출하는 중...'
+    })
+
+    // Simulate processing progress
+    await smoothProgress(45, 75, 1000, '텍스트를 정밀하게 추출하는 중...')
+
     const result = await response.json()
 
     onProgress?.({
       status: 'completing',
-      progress: 90,
+      progress: 85,
       message: '텍스트 정제 중...'
     })
 
@@ -81,6 +110,8 @@ export async function extractTextFromImage(
       ?.map((page: any) => page.ParsedText || '')
       .join('\n\n')
       .trim() || ''
+
+    await smoothProgress(85, 100, 300, '텍스트 추출 완료!')
 
     onProgress?.({
       status: 'complete',
