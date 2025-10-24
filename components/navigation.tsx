@@ -50,9 +50,10 @@ export function Navigation() {
     ...(hasResults
       ? [
           {
-            href: "/results",
+            href: "/",
             label: "분석",
             icon: Sparkles,
+            isAnalysis: true,
           },
         ]
       : []),
@@ -63,9 +64,14 @@ export function Navigation() {
     },
   ]
 
-  const getActiveState = (href: string) => {
-    if (href === "/results") {
-      return pathname === "/results" || pathname.startsWith("/results/")
+  const getActiveState = (href: string, isAnalysis?: boolean) => {
+    // For analysis button, check if we're on home page with results
+    if (isAnalysis) {
+      return pathname === "/" && hasResults
+    }
+    // For home button, only active if on home and NOT showing results
+    if (href === "/" && !isAnalysis) {
+      return pathname === "/" && !hasResults
     }
     return pathname === href
   }
@@ -103,14 +109,14 @@ export function Navigation() {
         <div className="backdrop-blur-xl bg-white/98 border-t border-gray-200 shadow-[0_-2px_16px_rgba(0,0,0,0.04)] px-3 py-1.5 safe-area-inset-bottom pointer-events-auto">
           <div className="flex items-center justify-around max-w-md mx-auto gap-1.5">
             <AnimatePresence mode="popLayout">
-              {navItems.map((item) => {
-                const isActive = getActiveState(item.href)
+              {navItems.map((item: any) => {
+                const isActive = getActiveState(item.href, item.isAnalysis)
                 const Icon = item.icon
 
                 return (
                   <motion.div
-                    key={item.href}
-                    initial={item.href === "/results" ? { scale: 0, opacity: 0 } : false}
+                    key={`${item.href}-${item.label}`}
+                    initial={item.isAnalysis ? { scale: 0, opacity: 0 } : false}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0, opacity: 0 }}
                     transition={{
