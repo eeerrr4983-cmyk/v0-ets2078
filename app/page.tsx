@@ -526,47 +526,67 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                         </GlassCard>
                       )}
 
-                      <GlassCard className="p-2 space-y-1">
+                      <GlassCard className="p-3 space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-medium text-gray-700">
+                          <span className="text-xs font-semibold text-gray-800">
                             {phase === "ocr" ? "텍스트 추출 중..." : "AI 분석 중..."}
                           </span>
                           {phase === "ocr" && (
-                            <span className="text-xs font-bold text-gray-900">{Math.floor(ocrProgress)}%</span>
+                            <motion.span 
+                              className="text-xs font-bold text-gray-900 tabular-nums"
+                              key={Math.floor(ocrProgress)}
+                              initial={{ scale: 1.2, opacity: 0.5 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              transition={{ duration: 0.2 }}
+                            >
+                              {Math.floor(ocrProgress)}%
+                            </motion.span>
                           )}
                         </div>
                         {phase === "ocr" && (
-                          <div className="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden shadow-inner">
+                          <div className="w-full h-2.5 bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 rounded-full overflow-hidden shadow-inner">
                             <motion.div
-                              className="h-full bg-gradient-to-r from-gray-800 via-gray-600 to-gray-800 rounded-full shadow-lg relative overflow-hidden"
+                              className="h-full bg-gradient-to-r from-gray-900 via-gray-700 to-gray-900 rounded-full shadow-lg relative overflow-hidden"
                               style={{ width: `${ocrProgress}%` }}
-                              transition={{ duration: 0.3, ease: "easeOut" }}
+                              transition={{ duration: 0.2, ease: "easeOut" }}
                             >
                               <motion.div
-                                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
                                 animate={{
                                   x: ["-100%", "200%"],
                                 }}
                                 transition={{
-                                  duration: 1.5,
+                                  duration: 1.2,
+                                  repeat: Number.POSITIVE_INFINITY,
+                                  ease: "linear",
+                                }}
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent" />
+                            </motion.div>
+                          </div>
+                        )}
+                        {phase === "analyzing" && (
+                          <div className="flex justify-center py-3">
+                            <motion.div className="relative">
+                              <motion.div
+                                className="w-10 h-10 border-4 border-gray-200 border-t-gray-900 rounded-full"
+                                animate={{ rotate: 360 }}
+                                transition={{
+                                  duration: 0.8,
+                                  repeat: Number.POSITIVE_INFINITY,
+                                  ease: "linear",
+                                }}
+                              />
+                              <motion.div
+                                className="absolute inset-0 w-10 h-10 border-4 border-transparent border-t-gray-400 rounded-full"
+                                animate={{ rotate: -360 }}
+                                transition={{
+                                  duration: 1.2,
                                   repeat: Number.POSITIVE_INFINITY,
                                   ease: "linear",
                                 }}
                               />
                             </motion.div>
-                          </div>
-                        )}
-                        {phase === "analyzing" && (
-                          <div className="flex justify-center py-2">
-                            <motion.div
-                              className="w-8 h-8 border-4 border-gray-200 border-t-gray-800 rounded-full"
-                              animate={{ rotate: 360 }}
-                              transition={{
-                                duration: 1,
-                                repeat: Number.POSITIVE_INFINITY,
-                                ease: "linear",
-                              }}
-                            />
                           </div>
                         )}
                       </GlassCard>
