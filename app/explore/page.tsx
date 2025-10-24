@@ -30,7 +30,7 @@ import {
 } from "lucide-react"
 import { StorageManager } from "@/components/storage-manager"
 import type { AnalysisResult, Comment, Reply } from "@/lib/types"
-import { useRouter } from "next/router"
+import { useRouter } from "next/navigation"
 import { AIMentoring } from "@/components/ai-mentoring"
 import { AuthModal } from "@/components/auth-modal"
 import { useAuth } from "@/lib/auth-context"
@@ -47,7 +47,11 @@ export default function ExplorePage() {
   const [analyses, setAnalyses] = useState<AnalysisResult[]>([])
   const [trendingAnalyses, setTrendingAnalyses] = useState<AnalysisResult[]>([])
   const [recommendedAnalyses, setRecommendedAnalyses] = useState<AnalysisResult[]>([])
-  const [interaction, setInteraction] = useState(StorageManager.getInteraction())
+  const [interaction, setInteraction] = useState<ReturnType<typeof StorageManager.getInteraction>>({
+    likedAgents: new Set(),
+    savedAgents: new Set(),
+    likedComments: new Set(),
+  })
   const [detailTab, setDetailTab] = useState<DetailTabOption>("strengths")
   const [isRefreshing, setIsRefreshing] = useState(false)
   const router = useRouter()
@@ -57,17 +61,24 @@ export default function ExplorePage() {
   const isGuest = user?.isGuest || false
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setInteraction(StorageManager.getInteraction())
+    }
     loadAnalyses()
   }, [])
 
   useEffect(() => {
-    setRecommendedAnalyses(StorageManager.getPersonalizedRecommendations(searchQuery))
+    if (typeof window !== 'undefined') {
+      setRecommendedAnalyses(StorageManager.getPersonalizedRecommendations(searchQuery))
+    }
   }, [searchQuery])
 
   const loadAnalyses = () => {
-    const allAnalyses = StorageManager.getPublicAnalyses()
-    setAnalyses(allAnalyses)
-    setTrendingAnalyses(StorageManager.getTrendingAnalyses())
+    if (typeof window !== 'undefined') {
+      const allAnalyses = StorageManager.getPublicAnalyses()
+      setAnalyses(allAnalyses)
+      setTrendingAnalyses(StorageManager.getTrendingAnalyses())
+    }
   }
 
   const handleRefresh = async () => {
