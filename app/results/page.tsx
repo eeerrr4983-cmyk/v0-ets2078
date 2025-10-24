@@ -56,54 +56,50 @@ export default function ResultsPage() {
     }
   }, [router])
 
-  // Fallback mock data in case of missing data
-  const displayResult = result || {
+  // Transform raw result for backward compatibility
+  const rawResult = result || {
     overallScore: 88,
     strengths: [
-      { title: "AI 및 데이터 분석 관련 탐구 활동", description: "구체적이고 심층적임" },
-      { title: "수학 세특", description: "문제 해결 과정과 사고력이 명확히 드러남" },
-      { title: "창의적 체험활동", description: "리더십과 협업 역량이 우수함" },
+      "AI 및 데이터 분석 관련 탐구 활동이 구체적이고 심층적임",
+      "수학 세특에서 문제 해결 과정과 사고력이 명확히 드러남",
+      "창의적 체험활동에서 리더십과 협업 역량이 우수함",
     ],
     improvements: [
-      "진로 희망 대비 전공 적합성을 보완할 추가 활동 필요.",
-      "3학년 1학기 세특에서 심화 탐구 내용 보강 권장.",
-      "교과 간 연계성을 강화하여 일관된 서사 구축 필요.",
+      "진로 희망 대비 전공 적합성을 보완할 추가 활동 필요",
+      "3학년 1학기 세특에서 심화 탐구 내용 보강 권장",
+      "교과 간 연계성을 강화하여 일관된 서사 구축 필요",
     ],
     errors: [
       {
-        id: "1",
-        title: "대학명 직접 명시",
+        type: "금지",
         content: "○○대학교 AI 캠프 참여",
-        severity: "high" as const,
-        description: "대학명 직접 명시 금지 (교육부 훈령 제530호)",
-        location: "1페이지",
+        reason: "대학명 직접 명시 금지 (교육부 훈령 제530호)",
+        page: 1,
         suggestion: "대학 주관 프로그램 → 교육기관 주관 프로그램으로 수정",
-        category: "기관명",
       },
     ],
     suggestions: [
-      "수학 세특: '데이터 분석' 키워드를 활용한 심화 탐구 추가 권장.",
-      "과학 세특: AI 윤리 관련 탐구로 진로 연계성 강화.",
+      "수학 세특: '데이터 분석' 키워드를 활용한 심화 탐구 추가 권장",
+      "과학 세특: AI 윤리 관련 탐구로 진로 연계성 강화",
     ],
   }
 
-  // Transform data for backward compatibility
   const displayResult = {
-    overallScore: displayResult.overallScore,
-    strengths: Array.isArray(displayResult.strengths) 
-      ? displayResult.strengths.map((s: any) => typeof s === 'string' ? s : `${s.title}: ${s.description}`)
+    overallScore: rawResult.overallScore,
+    strengths: Array.isArray(rawResult.strengths) 
+      ? rawResult.strengths.map((s: any) => typeof s === 'string' ? s : `${s.title}: ${s.description}`)
       : [],
-    improvements: displayResult.improvements || [],
-    errors: (displayResult.errors || []).map((e: any) => ({
-      type: e.severity === 'high' ? '금지' as const : '주의' as const,
+    improvements: rawResult.improvements || [],
+    errors: (rawResult.errors || []).map((e: any) => ({
+      type: e.type || (e.severity === 'high' ? '금지' : '주의') as const,
       content: e.content || e.location,
-      reason: e.description,
-      page: typeof e.location === 'string' && e.location.includes('페이지') 
+      reason: e.reason || e.description,
+      page: e.page || (typeof e.location === 'string' && e.location.includes('페이지') 
         ? parseInt(e.location) || 1 
-        : 1,
+        : 1),
       suggestion: e.suggestion,
     })),
-    suggestions: displayResult.suggestions || displayResult.recommendations?.map((r: any) => r.item) || [],
+    suggestions: rawResult.suggestions || rawResult.recommendations?.map((r: any) => r.item) || [],
   }
 
   const runAIKillerAnalysis = async () => {
@@ -300,7 +296,13 @@ ${displayResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
           >
             <Button
               variant="ghost"
-              onClick={() => router.back()}
+              onClick={() => {
+                // Ensure analyzing state persists when going back
+                if (typeof window !== 'undefined') {
+                  sessionStorage.setItem('is_analyzing', 'true')
+                }
+                router.push('/')
+              }}
               className="rounded-full hover:bg-gray-100 h-9 px-4 text-sm"
             >
               <ArrowLeft className="w-4 h-4 mr-1.5" />

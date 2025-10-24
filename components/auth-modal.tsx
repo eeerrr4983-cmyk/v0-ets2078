@@ -20,6 +20,12 @@ export function AuthModal({ onClose, onGuestContinue }: { onClose: () => void; o
 
   const handleGoogleAuth = async () => {
     const supabase = createClient()
+    
+    if (!supabase) {
+      setError("Google 로그인이 현재 사용 불가능합니다. Supabase 설정이 필요합니다.")
+      return
+    }
+    
     setIsLoading(true)
     setError("")
 
@@ -82,7 +88,12 @@ export function AuthModal({ onClose, onGuestContinue }: { onClose: () => void; o
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-gray-900">로그인</h2>
             <button
-              onClick={onClose}
+              onClick={() => {
+                onClose()
+                if (onGuestContinue) {
+                  onGuestContinue()
+                }
+              }}
               className="text-[10px] text-gray-400 hover:text-gray-600 transition-colors px-2 py-1"
             >
               비회원으로 돌아가기

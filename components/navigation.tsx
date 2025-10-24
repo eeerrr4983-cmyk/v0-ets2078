@@ -19,22 +19,23 @@ export function Navigation() {
       if (typeof window !== "undefined") {
         const currentAnalysis = sessionStorage.getItem("current_analysis")
         const isAnalyzing = sessionStorage.getItem("is_analyzing") === "true"
-        setHasResults(!!currentAnalysis || isAnalyzing)
+        const hasResult = !!currentAnalysis && isAnalyzing
+        setHasResults(hasResult)
       }
     }
 
+    // Initial check
     checkResults()
     
-    // Listen for storage changes
-    const handleStorageChange = () => checkResults()
-    window.addEventListener('storage', handleStorageChange)
+    // Custom event listener for immediate updates
+    const handleAnalysisChange = () => checkResults()
+    window.addEventListener('analysisStateChange', handleAnalysisChange)
     
-    // Also check more frequently during transitions
-    const interval = setInterval(checkResults, 200)
+    // Check on pathname change
+    checkResults()
     
     return () => {
-      clearInterval(interval)
-      window.removeEventListener('storage', handleStorageChange)
+      window.removeEventListener('analysisStateChange', handleAnalysisChange)
     }
   }, [pathname])
 

@@ -165,8 +165,12 @@ export default function HomePage() {
         phase === "complete"
       ) {
         sessionStorage.setItem("is_analyzing", "true")
-      } else {
+        // Dispatch custom event to notify navigation
+        window.dispatchEvent(new CustomEvent('analysisStateChange'))
+      } else if (phase === "idle") {
         sessionStorage.removeItem("is_analyzing")
+        // Dispatch custom event to notify navigation
+        window.dispatchEvent(new CustomEvent('analysisStateChange'))
       }
     }
   }, [phase])
@@ -247,13 +251,12 @@ export default function HomePage() {
         }
       )
 
-      if (!hasShownCompletion) {
-        setPhase("analysisComplete")
-        setShowAnalysisComplete(true)
-        setHasShownCompletion(true)
-        await new Promise((resolve) => setTimeout(resolve, 2000))
-        setShowAnalysisComplete(false)
-      }
+      // Show completion animation only once
+      setPhase("analysisComplete")
+      setShowAnalysisComplete(true)
+      setHasShownCompletion(true)
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+      setShowAnalysisComplete(false)
 
       // Enhance analysis result with additional data
       const finalResult: AnalysisResult = {
@@ -369,8 +372,9 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
     setProgressMessage("")
     setCurrentTip("")
     setCareerDirection("")
-    // sessionStorage.removeItem("current_analysis")
-    // sessionStorage.removeItem("is_analyzing")
+    // Keep analysis in sessionStorage so navigation works correctly
+    // Only remove the "is_analyzing" flag to allow reanalysis
+    sessionStorage.removeItem("is_analyzing")
   }
 
   const isFixedScreen =
