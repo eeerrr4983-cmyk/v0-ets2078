@@ -30,7 +30,8 @@ import {
 } from "lucide-react"
 import { StorageManager } from "@/components/storage-manager"
 import type { AnalysisResult } from "@/lib/types"
-import { extractTextFromImage } from "@/lib/ocr"
+import { extractTextFromImage, extractTextWithFallback } from "@/lib/ocr-service"
+import { analyzeSaenggibu } from "@/lib/gemini-service"
 import { TeacherCommunicationHelper } from "@/components/teacher-communication-helper"
 import { AIKillerDetector } from "@/components/ai-killer-detector"
 import { UniversityPredictor } from "@/components/university-predictor"
@@ -109,9 +110,9 @@ export default function HomePage() {
   const [hasShownCompletion, setHasShownCompletion] = useState(false)
 
   useEffect(() => {
-    const history = StorageManager.getUserAnalyses(userSessionId)
-    setAnalysisHistory(history.slice(-3))
-  }, [userSessionId])
+    const history = StorageManager.getRecentActivity(userSessionId)
+    setAnalysisHistory(history)
+  }, [userSessionId, phase])
 
   useEffect(() => {
     if (phase === "ocr" || phase === "analyzing") {
@@ -193,129 +194,91 @@ export default function HomePage() {
       sessionStorage.setItem("is_analyzing", "true")
     }
 
-    setPhase("uploading")
-    setProgressMessage("파일을 업로드하는 중이에요.")
-    await new Promise((resolve) => setTimeout(resolve, 600))
+    try {
+      setPhase("uploading")
+      setProgressMessage("파일을 업로드하는 중이에요.")
+      await new Promise((resolve) => setTimeout(resolve, 600))
 
-    setPhase("ocr")
-    setProgressMessage(PROGRESS_MESSAGES.ocr[0])
-    const extractedTexts: string[] = []
+      setPhase("ocr")
+      setProgressMessage(PROGRESS_MESSAGES.ocr[0])
+      const extractedTexts: string[] = []
 
-    const totalFiles = files.length
+      const totalFiles = files.length
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        const fileProgressStart = (i / totalFiles) * 100
+        const fileProgressEnd = ((i + 1) / totalFiles) * 100
 
-      const fileProgressStart = (i / totalFiles) * 100
-      const fileProgressEnd = ((i + 1) / totalFiles) * 100
-
-      const progressSteps = 60
-      const stepSize = (fileProgressEnd - fileProgressStart) / progressSteps
-
-      for (let step = 0; step < progressSteps; step++) {
-        await new Promise((resolve) => setTimeout(resolve, 30))
-        setOcrProgress(Math.min(99, fileProgressStart + stepSize * (step + 1)))
+        try {
+          const text = await extractTextWithFallback(file, (progress) => {
+            const currentProgress = fileProgressStart + (fileProgressEnd - fileProgressStart) * (progress.progress / 100)
+            setOcrProgress(Math.min(99, currentProgress))
+            if (progress.message) {
+              setProgressMessage(progress.message)
+            }
+          })
+          extractedTexts.push(text)
+        } catch (error) {
+          console.error("[OCR Error]", error)
+          extractedTexts.push("")
+        }
       }
 
-      try {
-        const text = await extractTextFromImage(file)
-        extractedTexts.push(text)
-      } catch (error) {
-        console.error("[v0] OCR 오류:", error)
-        extractedTexts.push("")
+      setOcrProgress(100)
+      await new Promise((resolve) => setTimeout(resolve, 300))
+
+      // Combine all extracted text
+      const fullText = extractedTexts.join("\n\n")
+
+      if (!fullText.trim()) {
+        throw new Error("텍스트를 추출할 수 없습니다. 이미지를 다시 확인해주세요.")
       }
+
+      setPhase("analyzing")
+      setProgressMessage(PROGRESS_MESSAGES.analyzing[0])
+
+      // Real AI Analysis using Gemini
+      const analysisResult = await analyzeSaenggibu(
+        fullText,
+        careerDirection,
+        (progress) => {
+          // Update progress during analysis
+        }
+      )
+
+      if (!hasShownCompletion) {
+        setPhase("analysisComplete")
+        setShowAnalysisComplete(true)
+        setHasShownCompletion(true)
+        await new Promise((resolve) => setTimeout(resolve, 2000))
+        setShowAnalysisComplete(false)
+      }
+
+      // Enhance analysis result with additional data
+      const finalResult: AnalysisResult = {
+        ...analysisResult,
+        id: Date.now().toString(),
+        studentName: shareData.name || "학생",
+        uploadDate: new Date().toISOString(),
+        files: files.map((f) => f.name),
+        isPrivate: true,
+        likes: 0,
+        saves: 0,
+        comments: [],
+        userId: userSessionId,
+      }
+
+      // Save to storage
+      StorageManager.saveAnalysis(finalResult)
+
+      setAnalysisResult(finalResult)
+      setPhase("complete")
+    } catch (error) {
+      console.error("[Analysis Error]", error)
+      alert(error instanceof Error ? error.message : "분석 중 오류가 발생했습니다.")
+      resetAnalysis()
     }
-
-    setOcrProgress(100)
-    await new Promise((resolve) => setTimeout(resolve, 200))
-
-    setPhase("analyzing")
-    setProgressMessage(PROGRESS_MESSAGES.analyzing[0])
-    await new Promise((resolve) => setTimeout(resolve, 1800))
-
-    if (!hasShownCompletion) {
-      setPhase("analysisComplete")
-      setShowAnalysisComplete(true)
-      setHasShownCompletion(true)
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-      setShowAnalysisComplete(false)
-    }
-
-    const careerAlignmentPercentage = careerDirection ? Math.floor(Math.random() * 30) + 60 : 0
-
-    const mockErrors = [
-      {
-        type: "금지",
-        content: "○○대학교 AI 캠프 참여",
-        reason: "대학명 직접 명시 금지 (교육부 훈령 제530호)",
-        page: 1,
-        suggestion: "대학 주최 AI 캠프 참여로 수정 권장",
-        riskLevel: 3,
-      },
-      {
-        type: "금지",
-        content: "TOEIC 900점 취득",
-        reason: "공인어학시험 점수 기재 금지",
-        page: 3,
-        suggestion: "영어 의사소통 능력 우수로 표현",
-        riskLevel: 3,
-      },
-      {
-        type: "주의",
-        content: "매사에 성실하고 적극적이며 앞으로가 기대됨",
-        reason: "모호한 칭찬 표현, 구체적 관찰 근거 부족",
-        page: 2,
-        suggestion: "구체적인 활동 사례와 함께 성실성을 표현",
-        riskLevel: 1,
-      },
-    ].sort((a, b) => b.riskLevel - a.riskLevel)
-
-    const mockResult: AnalysisResult = {
-      id: Date.now().toString(),
-      studentName: "학생",
-      uploadDate: new Date().toISOString(),
-      overallScore: 88,
-      careerDirection: careerDirection || undefined,
-      careerAlignment: careerDirection
-        ? {
-            percentage: careerAlignmentPercentage,
-            summary:
-              careerAlignmentPercentage >= 80
-                ? "진로 방향과 매우 잘 부합하는 생기부입니다."
-                : careerAlignmentPercentage >= 60
-                  ? "진로 방향과 적절히 연계된 생기부입니다."
-                  : "진로 연계성을 더 강화하면 좋습니다.",
-            strengths: ["AI 관련 활동이 진로와 직접 연결됨", "데이터 분석 역량이 우수함"],
-            improvements: ["심화 탐구 활동 추가 권장", "전공 관련 독서 활동 보강"],
-          }
-        : undefined,
-      strengths: [
-        "AI 및 데이터 분석 관련 탐구 활동이 구체적이고 심층적임",
-        "수학 세특에서 문제 해결 과정과 사고력이 명확히 드러남",
-        "창의적 체험활동에서 리더십과 협업 역량이 우수함",
-      ],
-      improvements: [
-        "진로 희망 대비 전공 적합성을 보완할 추가 활동 필요",
-        "3학년 1학기 세특에서 심화 탐구 내용 보강 권장",
-        "교과 간 연계성을 강화하여 일관된 서사 구축 필요",
-      ],
-      errors: mockErrors,
-      suggestions: [
-        "수학 세특: '데이터 분석' 키워드를 활용한 심화 탐구 추가 권장",
-        "과학 세특: AI 윤리 관련 탐구로 진로 연계성 강화",
-        "동아리 활동: 구체적인 역할과 성과를 명확히 기술",
-      ],
-      files: files.map((f) => f.name),
-      isPrivate: true,
-      likes: 0,
-      saves: 0,
-      comments: [],
-      userId: userSessionId,
-      studentProfile: "AI에 관심이 많은 학생으로 추정",
-    }
-
-    setAnalysisResult(mockResult)
-    setPhase("complete")
   }
 
   const handleShareClick = () => {
@@ -511,30 +474,13 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                       </div>
                       <div className="space-y-1">
                         {analysisHistory.map((analysis) => {
-                          const uploadDate = new Date(analysis.uploadDate)
-                          const now = new Date()
-                          const diffMs = now.getTime() - uploadDate.getTime()
-                          const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
-                          const diffDays = Math.floor(diffHours / 24)
-
-                          let timeDisplay = ""
-                          if (diffHours < 24) {
-                            // Today - show time
-                            timeDisplay = uploadDate.toLocaleTimeString("ko-KR", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })
-                          } else if (diffDays === 1) {
-                            // Yesterday
-                            timeDisplay = "어제"
-                          } else {
-                            // Older - show date
-                            timeDisplay = `${uploadDate.getMonth() + 1}/${uploadDate.getDate()}`
-                          }
+                          const timeDisplay = StorageManager.formatTimeAgo(
+                            analysis.uploadDate || analysis.timestamp || new Date().toISOString()
+                          )
 
                           return (
                             <button
-                              key={analysis.id}
+                              key={analysis.id || Math.random().toString()}
                               onClick={() => {
                                 setAnalysisResult(analysis)
                                 setPhase("complete")
@@ -543,10 +489,15 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                                   sessionStorage.setItem("is_analyzing", "true")
                                 }
                               }}
-                              className="w-full p-2 bg-gray-50/80 hover:bg-gray-100/80 rounded-lg border border-gray-200/50 text-left transition-all"
+                              className="w-full p-2 bg-gray-50/80 hover:bg-gray-100/80 rounded-lg border border-gray-200/50 text-left transition-all duration-200 hover:shadow-sm"
                             >
                               <div className="flex items-center justify-between">
-                                <span className="text-xs font-medium text-gray-900">{analysis.overallScore}점</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-medium text-gray-900">{analysis.overallScore}점</span>
+                                  {analysis.errors && analysis.errors.length > 0 && (
+                                    <span className="text-[9px] text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full">\n                                      {analysis.errors.length}개 문제\n                                    </span>
+                                  )}
+                                </div>
                                 <span className="text-[9px] text-gray-500">{timeDisplay}</span>
                               </div>
                             </button>

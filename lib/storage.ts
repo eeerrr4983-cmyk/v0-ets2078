@@ -183,6 +183,53 @@ export class StorageManager {
     }
   }
 
+  // 최근 활동 가져오기 (최근 3개)
+  static getRecentActivity(userId: string): AnalysisResult[] {
+    try {
+      const userAnalyses = this.getUserAnalyses(userId)
+      // 최신순으로 정렬 후 3개만 반환
+      return userAnalyses
+        .sort((a, b) => {
+          const dateA = new Date(a.uploadDate || a.timestamp || 0).getTime()
+          const dateB = new Date(b.uploadDate || b.timestamp || 0).getTime()
+          return dateB - dateA
+        })
+        .slice(0, 3)
+    } catch (error) {
+      this.handleStorageError(error, "getRecentActivity")
+      return []
+    }
+  }
+
+  // 시간 포맷팅 (오늘, 어제, MM/DD)
+  static formatTimeAgo(dateString: string): string {
+    try {
+      const date = new Date(dateString)
+      const now = new Date()
+      const diff = now.getTime() - date.getTime()
+      const daysDiff = Math.floor(diff / (1000 * 60 * 60 * 24))
+
+      if (daysDiff === 0) {
+        const hours = Math.floor(diff / (1000 * 60 * 60))
+        if (hours === 0) {
+          const minutes = Math.floor(diff / (1000 * 60))
+          return `${minutes}분 전`
+        }
+        return `${hours}시간 전`
+      } else if (daysDiff === 1) {
+        return '어제'
+      } else if (daysDiff < 7) {
+        return `${daysDiff}일 전`
+      } else {
+        const month = date.getMonth() + 1
+        const day = date.getDate()
+        return `${month}/${day}`
+      }
+    } catch (error) {
+      return ''
+    }
+  }
+
   static getPublicAnalyses(): AnalysisResult[] {
     try {
       const allAnalyses = this.getAllAnalyses()
