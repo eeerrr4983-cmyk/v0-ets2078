@@ -39,9 +39,11 @@ export function Navigation() {
   }, [pathname])
 
   useEffect(() => {
+    // Hide profile icon on results pages OR when showing analysis results on home
     const isResultsScreen = pathname === "/results" || pathname.startsWith("/results/")
-    setShowProfileIcon(!isResultsScreen)
-  }, [pathname])
+    const isShowingResults = pathname === "/" && hasResults
+    setShowProfileIcon(!isResultsScreen && !isShowingResults)
+  }, [pathname, hasResults])
 
   const navItems = [
     { href: "/", label: "홈", icon: Home, isHome: true },
