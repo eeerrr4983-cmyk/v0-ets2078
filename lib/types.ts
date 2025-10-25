@@ -30,6 +30,7 @@ export interface Reply {
   content: string
   createdAt: string
   likes: number
+  parentReplyId?: string // For nested replies (replies to replies)
 }
 
 export interface UserInteraction {

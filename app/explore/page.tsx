@@ -452,6 +452,17 @@ function AnalysisCard({
   const likes = analysis.likes || 0
   const saves = analysis.saves || 0
 
+  // Calculate total comment count (comments + all replies)
+  const getTotalCommentCount = () => {
+    let total = comments.length
+    comments.forEach((comment) => {
+      total += (comment.replies || []).length
+    })
+    return total
+  }
+
+  const totalCommentCount = getTotalCommentCount()
+
   const getUserDisplayName = () => {
     if (typeof window !== "undefined") {
       const storedStudentId = sessionStorage.getItem("student_id")
@@ -664,7 +675,7 @@ function AnalysisCard({
               className="flex items-center gap-1 text-xs text-gray-500 hover:text-black transition-colors"
             >
               <MessageCircle className="w-3.5 h-3.5" />
-              <span className="font-medium">{comments.length}</span>
+              <span className="font-medium">{totalCommentCount}</span>
             </button>
           </div>
 
