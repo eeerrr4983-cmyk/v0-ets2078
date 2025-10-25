@@ -9,9 +9,9 @@
 ## 📱 즉시 테스트 가능한 URL
 
 ### 🌐 **새로 빌드된 앱 주소**:
-```
+\`\`\`
 https://3000-i7votauvx4jx7je9zs3v2-8f57ffe2.sandbox.novita.ai
-```
+\`\`\`
 
 **중요**: 
 - ✅ 이전 캐시 완전 삭제됨 (`.next` 폴더 제거 후 재빌드)
@@ -199,7 +199,7 @@ https://3000-i7votauvx4jx7je9zs3v2-8f57ffe2.sandbox.novita.ai
 ## 📊 빌드 및 배포 정보
 
 ### 빌드 프로세스:
-```bash
+\`\`\`bash
 ✅ 1. .next 캐시 완전 삭제 (rm -rf .next)
 ✅ 2. 프로덕션 최적화 빌드 (npm run build)
    - 컴파일: 21.8초
@@ -208,22 +208,22 @@ https://3000-i7votauvx4jx7je9zs3v2-8f57ffe2.sandbox.novita.ai
 ✅ 3. 개발 서버 재시작 (npm run dev)
    - 시작 시간: 1.65초
    - 에러 없이 깨끗하게 실행 중
-```
+\`\`\`
 
 ### Git 커밋 이력:
-```
+\`\`\`
 ✅ d539326 - fix: 핵심 버그 8개 수정 - 강점표시,학번통일,카드UI,AI탐지,프로필숨김,모달연동
 ✅ e608993 - docs: 8가지 핵심 버그 수정사항 검증 체크리스트 추가
-```
+\`\`\`
 
 ### 서버 상태:
-```
+\`\`\`
 Status: ✅ Running
 Port: 3000
 Process ID: bash_fc9daf2c
 Errors: 0 (깨끗한 상태)
 Warnings: 0
-```
+\`\`\`
 
 ---
 
@@ -292,9 +292,9 @@ Warnings: 0
 
 ### ❌ 모든 기능이 작동 안 하는 경우:
 서버 로그 확인 요청:
-```
+\`\`\`
 BashOutput 도구로 bash_fc9daf2c 확인 요청
-```
+\`\`\`
 
 ---
 
