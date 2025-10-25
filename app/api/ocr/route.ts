@@ -42,7 +42,11 @@ export async function POST(request: NextRequest) {
       ocrForm.append("detectOrientation", "true")
       ocrForm.append("scale", "true")
       ocrForm.append("OCREngine", "2")
+      ocrForm.append("isTable", "true")
+      ocrForm.append("filetype", file.type.includes("pdf") ? "PDF" : "Auto")
       ocrForm.append("file", file, file.name)
+
+      console.log("[OCR] Processing file:", file.name, "Size:", file.size, "Type:", file.type)
 
       const response = await fetch(OCR_ENDPOINT, {
         method: "POST",
@@ -66,7 +70,16 @@ export async function POST(request: NextRequest) {
       }
 
       const parsedText = data.ParsedResults?.map((item) => item.ParsedText ?? "").join("\n\n") ?? ""
-      results.push(parsedText.trim())
+      const cleanedText = parsedText.trim()
+      
+      console.log("[OCR] Extracted text length:", cleanedText.length, "characters")
+      console.log("[OCR] First 200 characters:", cleanedText.substring(0, 200))
+      
+      if (cleanedText.length === 0) {
+        console.warn("[OCR] Warning: Empty text extracted from", file.name)
+      }
+      
+      results.push(cleanedText)
     }
 
     return NextResponse.json({ texts: results })

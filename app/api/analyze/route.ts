@@ -4,7 +4,7 @@ import { randomUUID } from "crypto"
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 const GEMINI_API_ENDPOINT =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent"
 
 export const maxDuration = 60
 
