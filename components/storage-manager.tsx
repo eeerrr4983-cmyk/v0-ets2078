@@ -139,4 +139,36 @@ export class StorageManager {
     if (!analysis.isPrivate) return true
     return analysis.userId === userId
   }
+
+  // 나의 최근 활동에 저장 (공유 여부와 무관하게 저장)
+  static saveToHistory(result: AnalysisResult): void {
+    if (typeof window === "undefined") return
+    
+    const history = this.getAnalysisHistory()
+    // 중복 방지: 같은 ID가 있으면 제거
+    const filtered = history.filter((h) => h.id !== result.id)
+    // 최신 항목을 앞에 추가
+    filtered.unshift(result)
+    // 최대 20개까지만 저장
+    const limited = filtered.slice(0, 20)
+    
+    localStorage.setItem("analysis_history", JSON.stringify(limited))
+  }
+
+  // 나의 최근 활동 가져오기
+  static getAnalysisHistory(): AnalysisResult[] {
+    if (typeof window === "undefined") return []
+    
+    const data = localStorage.getItem("analysis_history")
+    return data ? JSON.parse(data) : []
+  }
+
+  // 나의 최근 활동 삭제
+  static removeFromHistory(analysisId: string): void {
+    if (typeof window === "undefined") return
+    
+    const history = this.getAnalysisHistory()
+    const filtered = history.filter((h) => h.id !== analysisId)
+    localStorage.setItem("analysis_history", JSON.stringify(filtered))
+  }
 }

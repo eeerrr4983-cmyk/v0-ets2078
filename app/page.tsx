@@ -157,8 +157,27 @@ export default function HomePage() {
   const [hasShownCompletion, setHasShownCompletion] = useState(false)
 
   useEffect(() => {
-    const history = StorageManager.getUserAnalyses(userSessionId)
-    setAnalysisHistory(history.slice(-3))
+    // Load from history (not from shared analyses)
+    const history = StorageManager.getAnalysisHistory()
+    setAnalysisHistory(history.slice(0, 3)) // Show最近 3 items
+    
+    // Also check for existing analysis state
+    const checkAnalysisState = () => {
+      if (typeof window !== "undefined") {
+        const currentAnalysis = sessionStorage.getItem("current_analysis")
+        const isAnalyzing = sessionStorage.getItem("is_analyzing") === "true"
+        if (currentAnalysis && isAnalyzing) {
+          setAnalysisResult(JSON.parse(currentAnalysis))
+          setPhase("complete")
+        }
+      }
+    }
+    checkAnalysisState()
+    
+    // Listen for analysis state changes
+    const handleStateChange = () => checkAnalysisState()
+    window.addEventListener("analysisStateChange", handleStateChange)
+    return () => window.removeEventListener("analysisStateChange", handleStateChange)
   }, [userSessionId])
 
   useEffect(() => {
@@ -364,6 +383,19 @@ export default function HomePage() {
 
     setAnalysisResult(mockResult)
     setPhase("complete")
+    
+    // CRITICAL: Set analysis state immediately for navigation
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("current_analysis", JSON.stringify(mockResult))
+      sessionStorage.setItem("is_analyzing", "true")
+      window.dispatchEvent(new CustomEvent("analysisStateChange"))
+    }
+    
+    // Save to history immediately (even without sharing)
+    StorageManager.saveToHistory(mockResult)
+    
+    // Reload history to show in "나의 최근 활동"
+    setAnalysisHistory(StorageManager.getAnalysisHistory().slice(0, 3))
   }
 
   const handleShareClick = () => {
