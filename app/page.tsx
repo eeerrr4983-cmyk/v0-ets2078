@@ -786,32 +786,42 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                     </>
                   )}
 
-                  {phase === "analysisComplete" && showAnalysisComplete && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ type: "spring", bounce: 0.5, duration: 0.6 }}
-                      className="flex items-center justify-center"
-                    >
-                      <GlassCard className="p-10 text-center" glow>
-                        <motion.div
-                          animate={{
-                            scale: [1, 1.2, 1],
-                            rotate: [0, 15, -15, 0],
-                          }}
-                          transition={{
-                            duration: 0.8,
-                            ease: "easeInOut",
-                          }}
-                          className="w-28 h-28 rounded-full bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center mx-auto mb-4 shadow-lg"
-                        >
-                          <CheckCircle2 className="w-14 h-14 text-green-700" />
-                        </motion.div>
-                        <h3 className="text-4xl font-bold text-gray-900 mb-2">분석 완료!</h3>
-                        <p className="text-lg text-gray-600">결과를 확인하세요.</p>
-                      </GlassCard>
-                    </motion.div>
-                  )}
+                  <AnimatePresence mode="wait">
+                    {phase === "analysisComplete" && showAnalysisComplete && (
+                      <motion.div
+                        key="completion-popup"
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{
+                          type: "spring",
+                          stiffness: 300,
+                          damping: 25,
+                          duration: 0.4,
+                        }}
+                        className="flex items-center justify-center"
+                      >
+                        <GlassCard className="p-10 text-center" glow>
+                          <motion.div
+                            initial={{ scale: 0.8 }}
+                            animate={{
+                              scale: [0.8, 1.1, 1],
+                            }}
+                            transition={{
+                              duration: 0.6,
+                              ease: "easeOut",
+                              times: [0, 0.6, 1],
+                            }}
+                            className="w-28 h-28 rounded-full bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center mx-auto mb-4 shadow-lg"
+                          >
+                            <CheckCircle2 className="w-14 h-14 text-green-700" />
+                          </motion.div>
+                          <h3 className="text-4xl font-bold text-gray-900 mb-2">분석 완료!</h3>
+                          <p className="text-lg text-gray-600">결과를 확인하세요.</p>
+                        </GlassCard>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </motion.div>
               )}
 
