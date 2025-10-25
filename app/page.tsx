@@ -27,6 +27,8 @@ import {
   Compass,
   Lightbulb,
   User,
+  History,
+  ChevronRight,
 } from "lucide-react"
 import { StorageManager } from "@/components/storage-manager"
 import type { AnalysisResult } from "@/lib/types"
@@ -64,6 +66,52 @@ const PROGRESS_MESSAGES = {
     "강점과 보완점을 찾고 있어요.",
     "종합 평가를 계산하는 중이에요.",
   ],
+}
+
+// Helper function to generate AI-based titles for analysis history
+const generateAnalysisTitle = (analysis: AnalysisResult, index: number): string => {
+  if (analysis.studentName && analysis.studentName.trim()) {
+    return `${analysis.studentName}의 생기부`
+  }
+  // For anonymous users, generate unique student numbers
+  return `학생${index + 1}`
+}
+
+// Helper function for smart time display
+const getSmartTimeDisplay = (uploadDate: Date): string => {
+  const now = new Date()
+  const diffMs = now.getTime() - uploadDate.getTime()
+  const diffMinutes = Math.floor(diffMs / (1000 * 60))
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+  const diffDays = Math.floor(diffHours / 24)
+  const diffWeeks = Math.floor(diffDays / 7)
+  const diffMonths = Math.floor(diffDays / 30)
+
+  if (diffMinutes < 60) {
+    return "오늘"
+  } else if (diffHours < 24) {
+    return "오늘"
+  } else if (diffDays === 1) {
+    return "어제"
+  } else if (diffDays === 2) {
+    return "2일전"
+  } else if (diffDays === 3) {
+    return "3일전"
+  } else if (diffDays < 7) {
+    return `${diffDays}일전`
+  } else if (diffWeeks === 1) {
+    return "일주일전"
+  } else if (diffWeeks === 2) {
+    return "2주전"
+  } else if (diffMonths === 1) {
+    return "한달전"
+  } else if (diffMonths === 2) {
+    return "두달전"
+  } else if (diffMonths < 12) {
+    return `${diffMonths}달전`
+  } else {
+    return `${uploadDate.getMonth() + 1}/${uploadDate.getDate()}`
+  }
 }
 
 export default function HomePage() {
@@ -509,50 +557,51 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                   {analysisHistory.length > 0 && (
                     <GlassCard className="p-2.5 space-y-1.5">
                       <div className="flex items-center gap-1.5">
-                        <Shield className="w-3.5 h-3.5 text-gray-700" />
+                        <History className="w-3.5 h-3.5 text-gray-700" />
                         <h3 className="text-xs font-semibold text-gray-900">나의 최근 활동</h3>
                       </div>
-                      <div className="space-y-1">
-                        {analysisHistory.map((analysis) => {
+                      <div className="space-y-1.5">
+                        {analysisHistory.map((analysis, index) => {
                           const uploadDate = new Date(analysis.uploadDate)
-                          const now = new Date()
-                          const diffMs = now.getTime() - uploadDate.getTime()
-                          const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
-                          const diffDays = Math.floor(diffHours / 24)
-
-                          let timeDisplay = ""
-                          if (diffHours < 24) {
-                            // Today - show time
-                            timeDisplay = uploadDate.toLocaleTimeString("ko-KR", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })
-                          } else if (diffDays === 1) {
-                            // Yesterday
-                            timeDisplay = "어제"
-                          } else {
-                            // Older - show date
-                            timeDisplay = `${uploadDate.getMonth() + 1}/${uploadDate.getDate()}`
-                          }
+                          const timeDisplay = getSmartTimeDisplay(uploadDate)
+                          const title = generateAnalysisTitle(analysis, index)
 
                           return (
-                            <button
+                            <div
                               key={analysis.id}
-                              onClick={() => {
-                                setAnalysisResult(analysis)
-                                setPhase("complete")
-                                if (typeof window !== "undefined") {
-                                  sessionStorage.setItem("current_analysis", JSON.stringify(analysis))
-                                  sessionStorage.setItem("is_analyzing", "true")
-                                }
-                              }}
-                              className="w-full p-2 bg-gray-50/80 hover:bg-gray-100/80 rounded-lg border border-gray-200/50 text-left transition-all"
+                              className="w-full p-2.5 bg-gray-50/80 rounded-lg border border-gray-200/50 transition-all hover:border-gray-300/60"
                             >
-                              <div className="flex items-center justify-between">
-                                <span className="text-xs font-medium text-gray-900">{analysis.overallScore}점</span>
-                                <span className="text-[9px] text-gray-500">{timeDisplay}</span>
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <span className="text-xs font-semibold text-gray-900 truncate">{title}</span>
+                                    <span className="text-[10px] text-gray-500 whitespace-nowrap">{timeDisplay}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[11px] font-medium text-gray-700">종합 {analysis.overallScore}점</span>
+                                    {analysis.careerDirection && (
+                                      <span className="text-[10px] text-gray-500 truncate">• {analysis.careerDirection}</span>
+                                    )}
+                                  </div>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    setAnalysisResult(analysis)
+                                    setPhase("complete")
+                                    if (typeof window !== "undefined") {
+                                      sessionStorage.setItem("current_analysis", JSON.stringify(analysis))
+                                      sessionStorage.setItem("is_analyzing", "true")
+                                    }
+                                    window.scrollTo({ top: 0, behavior: "smooth" })
+                                  }}
+                                  className="h-7 px-2.5 text-[11px] bg-gray-900 hover:bg-gray-800 text-white rounded-md flex items-center gap-1 whitespace-nowrap flex-shrink-0"
+                                >
+                                  바로가기
+                                  <ChevronRight className="w-3 h-3" />
+                                </Button>
                               </div>
-                            </button>
+                            </div>
                           )
                         })}
                       </div>

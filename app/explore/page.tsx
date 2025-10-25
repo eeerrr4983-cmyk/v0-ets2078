@@ -30,7 +30,7 @@ import {
 } from "lucide-react"
 import { StorageManager } from "@/components/storage-manager"
 import type { AnalysisResult, Comment, Reply } from "@/lib/types"
-import { useRouter } from "next/router"
+import { useRouter } from "next/navigation"
 import { AIMentoring } from "@/components/ai-mentoring"
 import { AuthModal } from "@/components/auth-modal"
 import { useAuth } from "@/lib/auth-context"
@@ -47,7 +47,7 @@ export default function ExplorePage() {
   const [analyses, setAnalyses] = useState<AnalysisResult[]>([])
   const [trendingAnalyses, setTrendingAnalyses] = useState<AnalysisResult[]>([])
   const [recommendedAnalyses, setRecommendedAnalyses] = useState<AnalysisResult[]>([])
-  const [interaction, setInteraction] = useState(StorageManager.getInteraction())
+  const [interaction, setInteraction] = useState({ likedAgents: new Set<string>(), savedAgents: new Set<string>(), likedComments: new Set<string>() })
   const [detailTab, setDetailTab] = useState<DetailTabOption>("strengths")
   const [isRefreshing, setIsRefreshing] = useState(false)
   const router = useRouter()
@@ -57,6 +57,10 @@ export default function ExplorePage() {
   const isGuest = user?.isGuest || false
 
   useEffect(() => {
+    // Load interaction data on client-side only
+    if (typeof window !== "undefined") {
+      setInteraction(StorageManager.getInteraction())
+    }
     loadAnalyses()
   }, [])
 
