@@ -730,19 +730,50 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                             <img
                               src={uploadedImageUrls[0] || "/placeholder.svg"}
                               alt="업로드된 생기부"
-                              className="w-full h-full object-contain rounded-lg opacity-80"
+                              className="w-full h-full object-contain rounded-lg"
+                              style={{ filter: 'brightness(0.92) contrast(1.05)' }}
                             />
+                            {/* Premium scan effect with multiple layers */}
                             <motion.div
-                              className="absolute inset-0 bg-gradient-to-b from-transparent via-blue-500/30 to-transparent"
+                              className="absolute inset-0 pointer-events-none"
+                              style={{
+                                background: 'linear-gradient(180deg, transparent 0%, rgba(59, 130, 246, 0.12) 45%, rgba(96, 165, 250, 0.2) 50%, rgba(59, 130, 246, 0.12) 55%, transparent 100%)',
+                                height: '40%',
+                                filter: 'blur(2px)',
+                              }}
                               animate={{
-                                y: ["-100%", "200%"],
+                                y: ["-50%", "150%"],
                               }}
                               transition={{
-                                duration: 2,
-                                repeat: Number.POSITIVE_INFINITY,
-                                ease: "linear",
+                                duration: 2.5,
+                                repeat: Infinity,
+                                ease: "easeInOut",
+                                repeatType: "loop",
                               }}
                             />
+                            {/* Subtle shimmer effect */}
+                            <motion.div
+                              className="absolute inset-0 pointer-events-none"
+                              style={{
+                                background: 'linear-gradient(180deg, transparent 40%, rgba(255, 255, 255, 0.15) 50%, transparent 60%)',
+                                height: '25%',
+                              }}
+                              animate={{
+                                y: ["-30%", "130%"],
+                              }}
+                              transition={{
+                                duration: 2.5,
+                                repeat: Infinity,
+                                ease: "easeInOut",
+                                repeatType: "loop",
+                                delay: 0.3,
+                              }}
+                            />
+                            {/* Corner highlights */}
+                            <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-blue-500/40 rounded-tl-lg" />
+                            <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-blue-500/40 rounded-tr-lg" />
+                            <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-blue-500/40 rounded-bl-lg" />
+                            <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-blue-500/40 rounded-br-lg" />
                           </div>
                         </GlassCard>
                       )}
