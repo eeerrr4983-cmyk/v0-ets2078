@@ -18,29 +18,40 @@ export function Navigation() {
     const checkResults = () => {
       if (typeof window !== "undefined") {
         const currentAnalysis = sessionStorage.getItem("current_analysis")
-        setHasResults(!!currentAnalysis)
+        const isAnalyzing = sessionStorage.getItem("is_analyzing") === "true"
+        setHasResults(!!currentAnalysis && isAnalyzing)
       }
     }
 
+    // Initial check
     checkResults()
-    const interval = setInterval(checkResults, 500)
-    return () => clearInterval(interval)
+    
+    // Custom event listener for immediate updates
+    const handleAnalysisChange = () => checkResults()
+    window.addEventListener('analysisStateChange', handleAnalysisChange)
+    
+    // Check on pathname change
+    checkResults()
+    
+    return () => {
+      window.removeEventListener('analysisStateChange', handleAnalysisChange)
+    }
   }, [pathname])
 
   useEffect(() => {
-    const isAnalysisScreen = pathname === "/results" || pathname.startsWith("/results/")
-    const isAnalyzingSession = typeof window !== "undefined" && sessionStorage.getItem("is_analyzing") === "true"
-    setShowProfileIcon(!isAnalysisScreen && !isAnalyzingSession)
+    const isResultsScreen = pathname === "/results" || pathname.startsWith("/results/")
+    setShowProfileIcon(!isResultsScreen)
   }, [pathname])
 
   const navItems = [
-    { href: "/", label: "홈", icon: Home },
+    { href: "/", label: "홈", icon: Home, isHome: true },
     ...(hasResults
       ? [
           {
-            href: "/results",
+            href: "/",
             label: "분석",
             icon: Sparkles,
+            isAnalysis: true,
           },
         ]
       : []),
@@ -51,11 +62,17 @@ export function Navigation() {
     },
   ]
 
-  const getActiveState = (href: string) => {
-    if (href === "/results") {
-      return pathname === "/results" || pathname.startsWith("/results/")
+  const getActiveState = (item: any) => {
+    // For analysis button, active when on home page with results
+    if (item.isAnalysis) {
+      return pathname === "/" && hasResults
     }
-    return pathname === href
+    // For home button, only active when on home and NO results showing
+    if (item.isHome) {
+      return pathname === "/" && !hasResults
+    }
+    // For other buttons (like explore)
+    return pathname === item.href
   }
 
   const handleLogout = () => {
@@ -69,6 +86,35 @@ export function Navigation() {
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("openAuthModal"))
     }
+  }
+
+  const handleNavClick = (e: React.MouseEvent, item: any) => {
+    e.preventDefault()
+    
+    // Home button: clear analysis state and go to clean home
+    if (item.isHome) {
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('is_analyzing')
+        sessionStorage.removeItem('current_analysis')
+        window.dispatchEvent(new CustomEvent('analysisStateChange'))
+      }
+      router.push('/')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
+    
+    // Analysis button: scroll to results on current page
+    if (item.isAnalysis) {
+      if (pathname === '/') {
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      } else {
+        router.push('/')
+      }
+      return
+    }
+    
+    // Other buttons: normal navigation
+    router.push(item.href)
   }
 
   return (
@@ -92,13 +138,13 @@ export function Navigation() {
           <div className="flex items-center justify-around max-w-md mx-auto gap-1.5">
             <AnimatePresence mode="popLayout">
               {navItems.map((item) => {
-                const isActive = getActiveState(item.href)
+                const isActive = getActiveState(item)
                 const Icon = item.icon
 
                 return (
                   <motion.div
-                    key={item.href}
-                    initial={item.href === "/results" ? { scale: 0, opacity: 0 } : false}
+                    key={`${item.label}-${item.isAnalysis ? 'analysis' : item.isHome ? 'home' : 'other'}`}
+                    initial={item.isAnalysis ? { scale: 0, opacity: 0 } : false}
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0, opacity: 0 }}
                     transition={{
@@ -109,7 +155,7 @@ export function Navigation() {
                     }}
                     className="flex-1"
                   >
-                    <Link href={item.href} className="block">
+                    <button onClick={(e) => handleNavClick(e, item)} className="block w-full">
                       <motion.div
                         whileHover={{ scale: 1.03 }}
                         whileTap={{ scale: 0.97 }}
@@ -123,7 +169,7 @@ export function Navigation() {
                         <Icon className="w-4 h-4" />
                         <span className="text-[10px] font-medium">{item.label}</span>
                       </motion.div>
-                    </Link>
+                    </button>
                   </motion.div>
                 )
               })}

@@ -391,7 +391,10 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `생기부분석_${new Date().toLocaleDateString()}.txt`
+    const now = new Date()
+    const month = now.getMonth() + 1
+    const day = now.getDate()
+    a.download = `생기부AI분석결과_${month}/${day}.txt`
     a.click()
     URL.revokeObjectURL(url)
   }

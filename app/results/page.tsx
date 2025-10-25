@@ -261,7 +261,10 @@ ${mockResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
-    a.download = `생기부분석_${new Date().toLocaleDateString()}.txt`
+    const now = new Date()
+    const month = now.getMonth() + 1
+    const day = now.getDate()
+    a.download = `생기부AI분석결과_${month}/${day}.txt`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -282,7 +285,14 @@ ${mockResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
           >
             <Button
               variant="ghost"
-              onClick={() => router.push("/results")}
+              onClick={() => {
+                // Go back to results page (home with results showing)
+                router.push('/')
+                // Scroll to top
+                setTimeout(() => {
+                  window.scrollTo({ top: 0, behavior: 'smooth' })
+                }, 100)
+              }}
               className="rounded-full hover:bg-gray-100 h-9 px-4 text-sm"
             >
               <ArrowLeft className="w-4 h-4 mr-1.5" />
