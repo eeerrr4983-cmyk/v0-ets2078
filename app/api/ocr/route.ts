@@ -14,7 +14,7 @@ interface OcrSpaceResult {
   ErrorMessage?: string | string[]
 }
 
-async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 45000) {
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 25000) {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
@@ -28,136 +28,96 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 4
   } catch (error) {
     clearTimeout(timeoutId)
     if (error instanceof Error && error.name === "AbortError") {
-      throw new Error("OCR 처리 시간이 초과되었습니다. 이미지 크기를 줄이거나 더 선명한 이미지를 사용해주세요.")
+      throw new Error("OCR 처리 시간 초과. 이미지를 더 작게 만들어주세요 (권장: 1MB 이하)")
     }
     throw error
   }
 }
 
-async function optimizeImage(file: File): Promise<File> {
-  // If file is already small enough, return as-is
-  if (file.size < 2 * 1024 * 1024) {
-    // Less than 2MB
-    return file
-  }
-
-  console.log("[OCR] Optimizing large image:", file.name, "Size:", file.size)
-
-  // For images larger than 2MB, we'll reduce quality
-  // This is a simple approach - in production you might want more sophisticated compression
-  return file
-}
-
 export async function POST(request: NextRequest) {
   try {
     if (!OCR_SPACE_API_KEY) {
-      console.error("[OCR] Missing OCR_SPACE_API_KEY environment variable")
-      return NextResponse.json({ error: "서버에 OCR API 키가 설정되지 않았습니다." }, { status: 500 })
+      console.error("[OCR] Missing OCR_SPACE_API_KEY")
+      return NextResponse.json({ error: "OCR API 키가 설정되지 않았습니다." }, { status: 500 })
     }
 
     const formData = await request.formData()
     const files = formData.getAll("files")
 
     if (!files.length) {
-      return NextResponse.json({ error: "업로드된 파일이 없습니다." }, { status: 400 })
+      return NextResponse.json({ error: "파일이 없습니다." }, { status: 400 })
+    }
+
+    const filesToProcess = files.slice(0, 2).filter((file): file is File => {
+      if (!(file instanceof File)) return false
+      if (file.size > 5 * 1024 * 1024) {
+        console.warn("[OCR] File too large:", file.name, file.size)
+        return false
+      }
+      return true
+    })
+
+    if (filesToProcess.length === 0) {
+      return NextResponse.json({ error: "유효한 파일이 없습니다. 파일 크기는 5MB 이하여야 합니다." }, { status: 400 })
     }
 
     const results: string[] = []
 
-    for (const file of files) {
-      if (!(file instanceof File)) {
-        continue
-      }
-
-      const optimizedFile = await optimizeImage(file)
-
-      const ocrForm = new FormData()
-      ocrForm.append("apikey", OCR_SPACE_API_KEY)
-      ocrForm.append("language", "kor")
-      ocrForm.append("isOverlayRequired", "false")
-      ocrForm.append("detectOrientation", "true")
-      ocrForm.append("scale", "true")
-      ocrForm.append("OCREngine", "2")
-      ocrForm.append("isTable", "true")
-      ocrForm.append("filetype", optimizedFile.type.includes("pdf") ? "PDF" : "Auto")
-      ocrForm.append("file", optimizedFile, optimizedFile.name)
-
-      console.log(
-        "[OCR] Processing file:",
-        optimizedFile.name,
-        "Size:",
-        optimizedFile.size,
-        "Type:",
-        optimizedFile.type,
-      )
-
-      let response: Response
+    for (const file of filesToProcess) {
       try {
-        response = await fetchWithTimeout(
-          OCR_ENDPOINT,
-          {
-            method: "POST",
-            body: ocrForm,
-          },
-          45000,
-        )
-      } catch (error) {
-        if (error instanceof Error) {
-          console.error("[OCR] Fetch timeout or error:", error.message)
-          throw error
+        const ocrForm = new FormData()
+        ocrForm.append("apikey", OCR_SPACE_API_KEY)
+        ocrForm.append("language", "kor")
+        ocrForm.append("isOverlayRequired", "false")
+        ocrForm.append("OCREngine", "1")
+        ocrForm.append("file", file, file.name)
+
+        console.log("[OCR] Processing:", file.name, "Size:", Math.round(file.size / 1024) + "KB")
+
+        const response = await fetchWithTimeout(OCR_ENDPOINT, {
+          method: "POST",
+          body: ocrForm,
+        })
+
+        const contentType = response.headers.get("content-type")
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error("[OCR] API error:", response.status, errorText.substring(0, 100))
+          throw new Error(`OCR 실패 (${response.status})`)
         }
-        throw new Error("OCR 요청 중 오류가 발생했습니다.")
+
+        if (!contentType?.includes("application/json")) {
+          const textResponse = await response.text()
+          console.error("[OCR] Non-JSON response:", textResponse.substring(0, 100))
+          throw new Error("OCR API 응답 형식 오류")
+        }
+
+        const data = (await response.json()) as OcrSpaceResult
+
+        if (data.IsErroredOnProcessing) {
+          const message = Array.isArray(data.ErrorMessage)
+            ? data.ErrorMessage.join(", ")
+            : data.ErrorMessage || "처리 오류"
+          console.error("[OCR] Processing error:", message)
+          throw new Error(message)
+        }
+
+        const parsedText = data.ParsedResults?.map((item) => item.ParsedText ?? "").join("\n\n") ?? ""
+        const cleanedText = parsedText.trim()
+
+        console.log("[OCR] Success:", cleanedText.length, "chars")
+        results.push(cleanedText)
+      } catch (fileError) {
+        console.error("[OCR] File error:", file.name, fileError)
+        results.push("") // Add empty to maintain order
       }
-
-      const contentType = response.headers.get("content-type")
-      const isJson = contentType?.includes("application/json")
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error("[OCR] API error response", response.status, errorText)
-        throw new Error(`OCR.space API 실패 (status: ${response.status}): ${errorText.substring(0, 100)}`)
-      }
-
-      if (!isJson) {
-        const textResponse = await response.text()
-        console.error("[OCR] Non-JSON response received:", textResponse.substring(0, 200))
-        throw new Error(`OCR.space API가 예상치 못한 응답을 반환했습니다: ${textResponse.substring(0, 100)}`)
-      }
-
-      let data: OcrSpaceResult
-      try {
-        data = (await response.json()) as OcrSpaceResult
-      } catch (parseError) {
-        const rawText = await response.text()
-        console.error("[OCR] JSON parse error. Raw response:", rawText.substring(0, 200))
-        throw new Error(`OCR 응답을 파싱할 수 없습니다. API 키를 확인해주세요.`)
-      }
-
-      if (data.IsErroredOnProcessing) {
-        const message = Array.isArray(data.ErrorMessage)
-          ? data.ErrorMessage.join(", ")
-          : data.ErrorMessage || "알 수 없는 오류"
-        console.error("[OCR] Processing error", message)
-        throw new Error(message)
-      }
-
-      const parsedText = data.ParsedResults?.map((item) => item.ParsedText ?? "").join("\n\n") ?? ""
-      const cleanedText = parsedText.trim()
-
-      console.log("[OCR] Extracted text length:", cleanedText.length, "characters")
-      console.log("[OCR] First 200 characters:", cleanedText.substring(0, 200))
-
-      if (cleanedText.length === 0) {
-        console.warn("[OCR] Warning: Empty text extracted from", optimizedFile.name)
-      }
-
-      results.push(cleanedText)
     }
 
     return NextResponse.json({ texts: results })
   } catch (error) {
-    console.error("[OCR] Unexpected error", error)
-    const message = error instanceof Error ? error.message : "OCR 처리 중 오류가 발생했습니다."
+    console.error("[OCR] Error:", error)
+    const message = error instanceof Error ? error.message : "OCR 처리 오류"
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
