@@ -673,7 +673,7 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                             <motion.div
                               className="h-full bg-gradient-to-r from-gray-800 via-gray-600 to-gray-800 rounded-full shadow-lg relative overflow-hidden"
                               style={{ width: `${ocrProgress}%` }}
-                              transition={{ duration: 0.3, ease: "easeOut" }}
+                              transition={{ duration: 0.2, ease: "easeOut" }}
                             >
                               <motion.div
                                 className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
@@ -681,9 +681,13 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                                   x: ["-100%", "200%"],
                                 }}
                                 transition={{
-                                  duration: 1.5,
-                                  repeat: Number.POSITIVE_INFINITY,
+                                  duration: 1.2,
+                                  repeat: Infinity,
                                   ease: "linear",
+                                  repeatType: "loop",
+                                }}
+                                style={{
+                                  willChange: "transform",
                                 }}
                               />
                             </motion.div>
@@ -695,9 +699,14 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                               className="w-8 h-8 border-4 border-gray-200 border-t-gray-800 rounded-full"
                               animate={{ rotate: 360 }}
                               transition={{
-                                duration: 1,
-                                repeat: Number.POSITIVE_INFINITY,
+                                duration: 0.8,
+                                repeat: Infinity,
                                 ease: "linear",
+                                repeatType: "loop",
+                              }}
+                              style={{
+                                willChange: "transform",
+                                transformOrigin: "center center",
                               }}
                             />
                           </div>
@@ -1130,7 +1139,16 @@ function ProcessCard({ icon: Icon, title, active, complete }: ProcessCardProps) 
         {active && !complete ? (
           <motion.div
             animate={{ rotate: 360 }}
-            transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
+            transition={{
+              duration: 1,
+              repeat: Infinity,
+              ease: "linear",
+              repeatType: "loop",
+            }}
+            style={{
+              willChange: "transform",
+              transformOrigin: "center center",
+            }}
           >
             <Loader2 className="w-5 h-5 text-black" />
           </motion.div>
