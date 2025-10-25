@@ -62,7 +62,16 @@ export default function ExplorePage() {
       setInteraction(StorageManager.getInteraction())
     }
     loadAnalyses()
-  }, [])
+    
+    // Listen for profile click from navigation
+    const handleOpenAuthModal = () => {
+      if (isGuest) {
+        setShowAuthModal(true)
+      }
+    }
+    window.addEventListener('openAuthModal', handleOpenAuthModal)
+    return () => window.removeEventListener('openAuthModal', handleOpenAuthModal)
+  }, [isGuest])
 
   useEffect(() => {
     setRecommendedAnalyses(StorageManager.getPersonalizedRecommendations(searchQuery))

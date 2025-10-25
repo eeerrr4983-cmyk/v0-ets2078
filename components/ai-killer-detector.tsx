@@ -31,23 +31,28 @@ export function AIKillerDetector({ analysisResult, onClose }: AIKillerDetectorPr
         // Import the AI detection function
         const { detectAIWriting } = await import('@/lib/gemini-service')
         
-        // Construct text from analysis result
-        const textToAnalyze = [
-          ...analysisResult.strengths,
-          ...analysisResult.improvements,
-          ...analysisResult.suggestions,
-        ].join('\n')
+        // Use original OCR text, NOT the AI-generated analysis
+        const textToAnalyze = (analysisResult as any).originalText || 
+          '원본 텍스트를 찾을 수 없습니다. OCR 추출된 생기부 원본이 필요합니다.'
+        
+        if (!textToAnalyze || textToAnalyze.includes('원본 텍스트를 찾을 수 없습니다')) {
+          throw new Error('OCR 원본 텍스트가 없습니다')
+        }
         
         const detectionResult = await detectAIWriting(textToAnalyze)
         setResult(detectionResult)
       } catch (error) {
         console.error('[AI Killer Detection Error]', error)
-        // Fallback to safe result
+        // Show error message
         setResult({
           overallAIProbability: 0,
           riskAssessment: "안전",
           detectedSections: [],
-          recommendations: ['AI 작성 탐지를 완료할 수 없습니다. 다시 시도해주세요.']
+          recommendations: [
+            'AI 작성 탐지를 완료할 수 없습니다.',
+            '원본 생기부 텍스트가 필요합니다.',
+            error instanceof Error ? error.message : '알 수 없는 오류'
+          ]
         })
       } finally {
         setIsAnalyzing(false)

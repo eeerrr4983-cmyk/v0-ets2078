@@ -68,24 +68,38 @@ const PROGRESS_MESSAGES = {
   ],
 }
 
-// Helper function to generate unique 4-digit student IDs
-const generateStudentId = (analysis: AnalysisResult, index: number): string => {
-  if (analysis.studentId && analysis.studentId.length === 4) {
-    return analysis.studentId
+// Helper function to get consistent user-specific student ID
+const getUserStudentId = (): string => {
+  if (typeof window === 'undefined') return '0000'
+  
+  // Try to get from sessionStorage (user's actual student ID)
+  const storedStudentId = sessionStorage.getItem('student_id')
+  if (storedStudentId && storedStudentId.length === 4) {
+    return storedStudentId
   }
-  // Generate 4-digit ID based on timestamp (last 4 digits)
-  const timestamp = analysis.id || Date.now().toString()
-  const lastFourDigits = timestamp.slice(-4)
-  return lastFourDigits
+  
+  // Generate consistent ID based on user session (NOT per analysis)
+  const userSessionId = sessionStorage.getItem('user_session_id') || ''
+  if (userSessionId) {
+    // Hash the session ID to get consistent 4 digits for this user
+    let hash = 0
+    for (let i = 0; i < userSessionId.length; i++) {
+      hash = ((hash << 5) - hash) + userSessionId.charCodeAt(i)
+      hash = hash & hash // Convert to 32bit integer
+    }
+    const fourDigits = String(Math.abs(hash) % 10000).padStart(4, '0')
+    return fourDigits
+  }
+  
+  return '0000'
 }
 
 // Helper function to generate AI-based titles for analysis history
 const generateAnalysisTitle = (analysis: AnalysisResult, index: number): string => {
-  const studentId = generateStudentId(analysis, index)
+  const studentId = getUserStudentId() // Use consistent user ID
   if (analysis.studentName && analysis.studentName.trim()) {
     return `학생${studentId}`
   }
-  // For anonymous users, use generated student number
   return `학생${studentId}`
 }
 
@@ -144,6 +158,16 @@ export default function HomePage() {
   const [showAIKiller, setShowAIKiller] = useState(false)
   const [showUniversityPredictor, setShowUniversityPredictor] = useState(false)
   const [showProjectRecommender, setShowProjectRecommender] = useState(false)
+  
+  // Notify navigation when modals open/close
+  useEffect(() => {
+    const anyModalOpen = showAIKiller || showUniversityPredictor || showProjectRecommender || showTeacherHelper
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('modalStateChange', {
+        detail: { isModalOpen: anyModalOpen }
+      }))
+    }
+  }, [showAIKiller, showUniversityPredictor, showProjectRecommender, showTeacherHelper])
   const [progressMessage, setProgressMessage] = useState("")
   const [currentTip, setCurrentTip] = useState("")
   const [resultTab, setResultTab] = useState<ResultTab>("strengths")
@@ -345,40 +369,16 @@ export default function HomePage() {
       analysisResult.saves = 0
       analysisResult.comments = []
       analysisResult.userId = userSessionId
+      analysisResult.originalText = combinedText // Store OCR text for AI detection
       
     } catch (error) {
       console.error('[Analysis Error]', error)
       
-      // Fallback to minimal mock data on error
-      analysisResult = {
-        id: Date.now().toString(),
-        studentName: "학생",
-        uploadDate: new Date().toISOString(),
-        overallScore: 75,
-        careerDirection: careerDirection || undefined,
-        strengths: [
-          "생기부 업로드 완료",
-          "텍스트 추출 성공",
-          "AI 분석 시도됨"
-        ],
-        improvements: [
-          "분석 중 오류 발생 - 다시 시도해주세요",
-          "이미지 품질을 확인해주세요",
-          "잠시 후 다시 시도해주세요"
-        ],
-        errors: [],
-        suggestions: [
-          "이미지가 선명한지 확인하세요",
-          "여러 장인 경우 순서대로 업로드하세요"
-        ],
-        files: files.map((f) => f.name),
-        isPrivate: true,
-        likes: 0,
-        saves: 0,
-        comments: [],
-        userId: userSessionId,
-        studentProfile: "분석 대기 중인 학생"
-      }
+      // Show error message and stop - DO NOT create fake results
+      setPhase("idle")
+      setProgressMessage("")
+      alert(`분석 중 오류가 발생했습니다.\n\n에러: ${error instanceof Error ? error.message : '알 수 없는 오류'}\n\n다시 시도해주세요.`)
+      return
     }
 
     // Show completion popup ONCE
@@ -749,83 +749,80 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                       </div>
 
                       {uploadedImageUrls.length > 0 && (
-                        <GlassCard className="p-2 relative overflow-hidden rounded-2xl">
-                          <div className="relative h-72">
-                            <AnimatePresence mode="wait">
-                              {uploadedImageUrls.map((url, index) => {
-                                const isCurrent = index === currentImageIndex
-                                const offset = index - currentImageIndex
-                                
-                                return (
-                                  <motion.div
-                                    key={url}
-                                    initial={false}
-                                    animate={{
-                                      x: offset * 100 + '%',
-                                      scale: isCurrent ? 1 : 0.9,
-                                      opacity: isCurrent ? 1 : 0.3,
-                                      zIndex: isCurrent ? 10 : uploadedImageUrls.length - Math.abs(offset),
+                        <GlassCard className="p-2 relative overflow-visible rounded-2xl">
+                          <div className="relative h-72" style={{ perspective: '1000px' }}>
+                            {/* Stacked card style - back to front */}
+                            {uploadedImageUrls.map((url, index) => {
+                              const isCurrent = index === currentImageIndex
+                              const isPast = index < currentImageIndex
+                              const isFuture = index > currentImageIndex
+                              
+                              // Calculate position offset for stacked effect
+                              const offsetX = isFuture ? (index - currentImageIndex) * 15 : 0
+                              const offsetY = isFuture ? (index - currentImageIndex) * 10 : 0
+                              const scale = isCurrent ? 1 : 0.95 - ((index - currentImageIndex) * 0.02)
+                              const zIndex = isCurrent ? 50 : (isFuture ? (100 - index) : 0)
+                              
+                              return (
+                                <motion.div
+                                  key={url}
+                                  initial={false}
+                                  animate={{
+                                    x: offsetX,
+                                    y: offsetY,
+                                    scale: isPast ? 0 : scale,
+                                    opacity: isPast ? 0 : (isCurrent ? 1 : 0.6),
+                                    rotateY: isFuture ? (index - currentImageIndex) * 2 : 0,
+                                  }}
+                                  transition={{
+                                    type: "spring",
+                                    stiffness: 260,
+                                    damping: 20,
+                                  }}
+                                  onClick={() => {
+                                    if (isFuture) {
+                                      setCurrentImageIndex(index)
+                                    }
+                                  }}
+                                  className="absolute inset-0 rounded-lg overflow-hidden shadow-lg cursor-pointer"
+                                  style={{
+                                    zIndex: zIndex,
+                                    transformStyle: 'preserve-3d',
+                                    pointerEvents: isCurrent || isFuture ? 'auto' : 'none',
+                                  }}
+                                >
+                                  <img
+                                    src={url || "/placeholder.svg"}
+                                    alt={`생기부 ${index + 1}페이지`}
+                                    className="w-full h-full object-contain"
+                                    style={{ 
+                                      filter: isCurrent ? 'brightness(0.92) contrast(1.05)' : 'brightness(0.8) contrast(0.9)',
                                     }}
-                                    transition={{
-                                      type: "spring",
-                                      stiffness: 300,
-                                      damping: 30,
-                                    }}
-                                    className="absolute inset-0"
-                                    style={{
-                                      pointerEvents: isCurrent ? 'auto' : 'none',
-                                    }}
-                                  >
-                                    <img
-                                      src={url || "/placeholder.svg"}
-                                      alt={`업로드된 생기부 ${index + 1}`}
-                                      className="w-full h-full object-contain rounded-lg"
-                                      style={{ filter: 'brightness(0.92) contrast(1.05)' }}
-                                    />
-                                  </motion.div>
-                                )
-                              })}
-                            </AnimatePresence>
+                                  />
+                                  
+                                  {/* Border highlight for back cards */}
+                                  {isFuture && (
+                                    <div className="absolute inset-0 border-2 border-blue-400/50 rounded-lg pointer-events-none" />
+                                  )}
+                                </motion.div>
+                              )
+                            })}
                             
-                            {/* Navigation arrows (only show if multiple images) */}
+                            {/* Image counter */}
                             {uploadedImageUrls.length > 1 && (
-                              <>
-                                {currentImageIndex > 0 && (
-                                  <button
-                                    onClick={() => setCurrentImageIndex(prev => prev - 1)}
-                                    className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-all"
-                                  >
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                                    </svg>
-                                  </button>
-                                )}
-                                {currentImageIndex < uploadedImageUrls.length - 1 && (
-                                  <button
-                                    onClick={() => setCurrentImageIndex(prev => prev + 1)}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-all"
-                                  >
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                    </svg>
-                                  </button>
-                                )}
-                                
-                                {/* Image counter */}
-                                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 px-3 py-1 rounded-full bg-black/60 text-white text-xs font-medium backdrop-blur-sm">
-                                  {currentImageIndex + 1} / {uploadedImageUrls.length}
-                                </div>
-                              </>
+                              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[60] px-3 py-1 rounded-full bg-black/70 text-white text-xs font-medium backdrop-blur-sm shadow-lg">
+                                {currentImageIndex + 1} / {uploadedImageUrls.length}
+                              </div>
                             )}
                             
-                            {/* Premium scan effect with multiple layers (only on current image) */}
+                            {/* Premium scan effect (only on current image) */}
                             <motion.div
-                              className="absolute inset-0 pointer-events-none"
+                              className="absolute inset-0 pointer-events-none rounded-lg"
                               style={{
                                 background: 'linear-gradient(180deg, transparent 0%, rgba(59, 130, 246, 0.12) 45%, rgba(96, 165, 250, 0.2) 50%, rgba(59, 130, 246, 0.12) 55%, transparent 100%)',
                                 height: '40%',
                                 filter: 'blur(2px)',
-                                zIndex: 15,
+                                zIndex: 55,
                               }}
                               animate={{
                                 y: ["-50%", "150%"],
@@ -837,30 +834,12 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                                 repeatType: "loop",
                               }}
                             />
-                            {/* Subtle shimmer effect */}
-                            <motion.div
-                              className="absolute inset-0 pointer-events-none"
-                              style={{
-                                background: 'linear-gradient(180deg, transparent 40%, rgba(255, 255, 255, 0.15) 50%, transparent 60%)',
-                                height: '25%',
-                                zIndex: 15,
-                              }}
-                              animate={{
-                                y: ["-30%", "130%"],
-                              }}
-                              transition={{
-                                duration: 2.5,
-                                repeat: Infinity,
-                                ease: "easeInOut",
-                                repeatType: "loop",
-                                delay: 0.3,
-                              }}
-                            />
+                            
                             {/* Corner highlights */}
-                            <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-blue-500/40 rounded-tl-lg z-15" />
-                            <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-blue-500/40 rounded-tr-lg z-15" />
-                            <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-blue-500/40 rounded-bl-lg z-15" />
-                            <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-blue-500/40 rounded-br-lg z-15" />
+                            <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-blue-500/40 rounded-tl-lg z-[55]" />
+                            <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-blue-500/40 rounded-tr-lg z-[55]" />
+                            <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-blue-500/40 rounded-bl-lg z-[55]" />
+                            <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-blue-500/40 rounded-br-lg z-[55]" />
                           </div>
                         </GlassCard>
                       )}

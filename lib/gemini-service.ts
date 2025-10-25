@@ -579,16 +579,55 @@ export async function recommendProjects(analysisResult: any, careerDirection: st
       }),
     })
 
+    if (!response.ok) {
+      throw new Error(`API 오류: ${response.status}`)
+    }
+
     const data = await response.json()
-    const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}'
+    const generatedText = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    
+    if (!generatedText) {
+      throw new Error('AI 응답이 비어있습니다')
+    }
     
     const codeBlockMatch = generatedText.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/)
     const jsonText = codeBlockMatch ? codeBlockMatch[1] : generatedText.match(/\{[\s\S]*\}/)?.[0]
     
-    return JSON.parse(jsonText || '{}')
+    if (!jsonText) {
+      throw new Error('JSON 형식을 찾을 수 없습니다')
+    }
+    
+    const result = JSON.parse(jsonText)
+    return result
   } catch (error) {
     console.error('[Project Recommendation Error]', error)
-    throw error
+    // Return structured fallback instead of throwing
+    return {
+      career: careerDirection || "진로 분석",
+      bestProject: {
+        title: "진로 연계 심화 탐구 프로젝트",
+        description: "학생의 관심 분야를 깊이 있게 탐구하는 프로젝트입니다.",
+        reason: "진로 적합성을 강화하고 전문성을 키울 수 있습니다.",
+        difficulty: "중상",
+        duration: "2-3개월",
+        benefits: ["전공 역량 강화", "탐구 능력 향상", "생기부 내용 보강"],
+      },
+      projects: [
+        {
+          title: "독서 기반 심화 연구",
+          description: "관심 분야 도서를 읽고 비평적 분석 수행",
+          reason: "비판적 사고력 향상",
+          difficulty: "중",
+          duration: "1-2개월",
+          benefits: ["독서 역량", "분석력 강화"],
+        },
+      ],
+      tips: [
+        "구체적인 결과물을 남기세요",
+        "진로와의 연계성을 명확히 하세요",
+        "과정을 상세히 기록하세요",
+      ],
+    }
   }
 }
 

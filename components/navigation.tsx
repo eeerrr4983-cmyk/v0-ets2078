@@ -13,6 +13,7 @@ export function Navigation() {
   const [hasResults, setHasResults] = useState(false)
   const { user, logout } = useAuth()
   const [showProfileIcon, setShowProfileIcon] = useState(true)
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   useEffect(() => {
     const checkResults = () => {
@@ -46,11 +47,21 @@ export function Navigation() {
   }, [pathname])
 
   useEffect(() => {
-    // Hide profile icon on results pages OR when showing analysis results on home
+    // Hide profile icon on results pages OR when showing analysis results on home OR when modal is open
     const isResultsScreen = pathname === "/results" || pathname.startsWith("/results/")
     const isShowingResults = pathname === "/" && hasResults
-    setShowProfileIcon(!isResultsScreen && !isShowingResults)
-  }, [pathname, hasResults])
+    setShowProfileIcon(!isResultsScreen && !isShowingResults && !isModalOpen)
+  }, [pathname, hasResults, isModalOpen])
+  
+  useEffect(() => {
+    // Listen for modal state changes
+    const handleModalChange = (e: Event) => {
+      const customEvent = e as CustomEvent
+      setIsModalOpen(customEvent.detail?.isModalOpen || false)
+    }
+    window.addEventListener('modalStateChange', handleModalChange)
+    return () => window.removeEventListener('modalStateChange', handleModalChange)
+  }, [])
 
   const navItems = [
     { href: "/", label: "홈", icon: Home, isHome: true },
