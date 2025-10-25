@@ -581,7 +581,7 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
         {user && !user.isGuest && <NotificationCenter />}
 
         <div
-          className={`relative z-10 h-full px-3 pt-2.5 pb-20 ${
+          className={`relative z-10 h-full px-4 pt-3 pb-20 ${
             isFixedScreen ? "overflow-hidden flex flex-col items-center justify-center" : "overflow-y-auto"
           }`}
         >
@@ -606,23 +606,25 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.96 }}
                   transition={{ duration: 0.3 }}
-                  className="space-y-2.5"
+                  className="space-y-3"
                 >
-                  <GlassCard className="p-2 space-y-1">
-                    <div className="flex items-center gap-1.5">
-                      <Compass className="w-3 h-3 text-blue-600" />
-                      <h3 className="text-[11px] font-semibold text-gray-900">진로방향 설계</h3>
+                  <GlassCard className="p-2.5">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <Compass className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-xs font-semibold text-gray-900">진로방향</h3>
+                        <p className="text-[9px] text-gray-500 leading-tight">선택 입력 - 더 정밀한 분석</p>
+                      </div>
                     </div>
-                    <p className="text-[9px] text-gray-600">나의 진학목표를 입력시 더 정밀한 분석을 받아볼수있어요.</p>
                     <Input
-                      placeholder=""
+                      placeholder="예: 의학계열, 공학계열, 인문사회..."
                       value={careerDirection}
                       onChange={(e) => setCareerDirection(e.target.value)}
-                      className="h-7 text-xs"
+                      className="h-8 text-xs border-gray-200/60 focus:border-blue-400"
                     />
                   </GlassCard>
 
-                  <GlassCard className="w-full p-6 text-center space-y-4" glow>
+                  <GlassCard className="w-full p-5 text-center space-y-3.5" glow>
                     <motion.div
                       animate={{
                         scale: [1, 1.05, 1],
@@ -633,13 +635,13 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                         repeat: Number.POSITIVE_INFINITY,
                         ease: "easeInOut",
                       }}
-                      className="w-14 h-14 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center mx-auto"
+                      className="w-16 h-16 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center mx-auto shadow-md"
                     >
-                      <Upload className="w-6 h-6 text-gray-700" />
+                      <Upload className="w-7 h-7 text-gray-700" />
                     </motion.div>
-                    <div className="space-y-1.5">
-                      <h3 className="text-base font-semibold text-gray-900">사상고 생기부AI 시작</h3>
-                      <p className="text-xs text-gray-600 leading-relaxed">생기부를 업로드하여 시작하세요.</p>
+                    <div className="space-y-1">
+                      <h3 className="text-lg font-bold text-gray-900">생기부 분석 시작</h3>
+                      <p className="text-xs text-gray-500">이미지를 업로드하여 AI 분석을 시작하세요</p>
                     </div>
                     <input
                       ref={fileInputRef}
@@ -651,7 +653,7 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                     />
                     <Button
                       size="lg"
-                      className="w-full max-w-xs text-sm h-10 rounded-full bg-gray-900 hover:bg-gray-800 text-white shadow-md hover:shadow-lg transition-all font-medium"
+                      className="w-full max-w-sm text-sm h-11 rounded-full bg-gray-900 hover:bg-gray-800 text-white shadow-md hover:shadow-xl transition-all font-semibold"
                       onClick={handleFileSelectClick}
                     >
                       <FileText className="w-4 h-4 mr-2" />
@@ -787,14 +789,24 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                       </GlassCard>
 
                       <div className="grid grid-cols-3 gap-1.5">
-                        <ProcessCard icon={Upload} title="업로드" active={false} complete={true} />
+                        <ProcessCard 
+                          icon={Upload} 
+                          title="업로드" 
+                          active={phase === "uploading"} 
+                          complete={phase !== "uploading"} 
+                        />
                         <ProcessCard
                           icon={Sparkles}
                           title="AI 분석"
                           active={phase === "ocr" || phase === "analyzing"}
-                          complete={false}
+                          complete={phase === "analysisComplete"}
                         />
-                        <ProcessCard icon={CheckCircle2} title="완료" active={false} complete={false} />
+                        <ProcessCard 
+                          icon={CheckCircle2} 
+                          title="완료" 
+                          active={false} 
+                          complete={phase === "analysisComplete"} 
+                        />
                       </div>
 
                       {uploadedImageUrls.length > 0 && (
