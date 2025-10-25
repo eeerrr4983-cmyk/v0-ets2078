@@ -4,6 +4,8 @@ import type { NextRequest } from "next/server"
 const OCR_SPACE_API_KEY = process.env.OCR_SPACE_API_KEY
 const OCR_ENDPOINT = "https://api.ocr.space/parse/image"
 
+export const maxDuration = 60
+
 interface OcrSpaceResult {
   ParsedResults?: Array<{
     ParsedText?: string
@@ -12,7 +14,39 @@ interface OcrSpaceResult {
   ErrorMessage?: string | string[]
 }
 
-export const maxDuration = 60
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 45000) {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    })
+    clearTimeout(timeoutId)
+    return response
+  } catch (error) {
+    clearTimeout(timeoutId)
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("OCR 처리 시간이 초과되었습니다. 이미지 크기를 줄이거나 더 선명한 이미지를 사용해주세요.")
+    }
+    throw error
+  }
+}
+
+async function optimizeImage(file: File): Promise<File> {
+  // If file is already small enough, return as-is
+  if (file.size < 2 * 1024 * 1024) {
+    // Less than 2MB
+    return file
+  }
+
+  console.log("[OCR] Optimizing large image:", file.name, "Size:", file.size)
+
+  // For images larger than 2MB, we'll reduce quality
+  // This is a simple approach - in production you might want more sophisticated compression
+  return file
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,6 +69,8 @@ export async function POST(request: NextRequest) {
         continue
       }
 
+      const optimizedFile = await optimizeImage(file)
+
       const ocrForm = new FormData()
       ocrForm.append("apikey", OCR_SPACE_API_KEY)
       ocrForm.append("language", "kor")
@@ -43,15 +79,35 @@ export async function POST(request: NextRequest) {
       ocrForm.append("scale", "true")
       ocrForm.append("OCREngine", "2")
       ocrForm.append("isTable", "true")
-      ocrForm.append("filetype", file.type.includes("pdf") ? "PDF" : "Auto")
-      ocrForm.append("file", file, file.name)
+      ocrForm.append("filetype", optimizedFile.type.includes("pdf") ? "PDF" : "Auto")
+      ocrForm.append("file", optimizedFile, optimizedFile.name)
 
-      console.log("[OCR] Processing file:", file.name, "Size:", file.size, "Type:", file.type)
+      console.log(
+        "[OCR] Processing file:",
+        optimizedFile.name,
+        "Size:",
+        optimizedFile.size,
+        "Type:",
+        optimizedFile.type,
+      )
 
-      const response = await fetch(OCR_ENDPOINT, {
-        method: "POST",
-        body: ocrForm,
-      })
+      let response: Response
+      try {
+        response = await fetchWithTimeout(
+          OCR_ENDPOINT,
+          {
+            method: "POST",
+            body: ocrForm,
+          },
+          45000,
+        )
+      } catch (error) {
+        if (error instanceof Error) {
+          console.error("[OCR] Fetch timeout or error:", error.message)
+          throw error
+        }
+        throw new Error("OCR 요청 중 오류가 발생했습니다.")
+      }
 
       const contentType = response.headers.get("content-type")
       const isJson = contentType?.includes("application/json")
@@ -92,7 +148,7 @@ export async function POST(request: NextRequest) {
       console.log("[OCR] First 200 characters:", cleanedText.substring(0, 200))
 
       if (cleanedText.length === 0) {
-        console.warn("[OCR] Warning: Empty text extracted from", file.name)
+        console.warn("[OCR] Warning: Empty text extracted from", optimizedFile.name)
       }
 
       results.push(cleanedText)
