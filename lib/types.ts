@@ -42,7 +42,9 @@ export interface UserInteraction {
 export interface AnalysisResult {
   id: string
   studentName: string
+  studentProfile?: string
   uploadDate: string
+  analyzedAt?: string
   overallScore: number
   careerDirection?: string // Add career direction field
   careerAlignment?: CareerAlignment // Add career alignment analysis
@@ -56,6 +58,7 @@ export interface AnalysisResult {
   comments: Comment[]
   userId: string
   isPrivate?: boolean
+  originalText?: string
   aiKillerResult?: AIKillerResult
 }
 

@@ -339,16 +339,15 @@ export default function HomePage() {
     setProgressMessage("AI가 생기부를 정밀하게 분석하는 중...")
 
     // Import Gemini service for real analysis
-    const { analyzeSaenggibu } = await import('@/lib/gemini-service')
+    const { analyzeSaenggibu } = await import("@/lib/gemini-service")
     
     let analysisResult: AnalysisResult
     
     try {
-      // Call real Gemini API with progress tracking
-      const combinedText = extractedTexts.join('\n\n')
+      const combinedText = extractedTexts.join("\n\n")
+      const analysisStart = Date.now()
       
-      analysisResult = await analyzeSaenggibu(combinedText, careerDirection, (progress) => {
-        // Update progress messages based on AI analysis stage
+      const baseAnalysis = await analyzeSaenggibu(combinedText, careerDirection, (progress) => {
         if (progress < 30) {
           setProgressMessage("AI가 생기부를 정밀하게 읽는 중...")
         } else if (progress < 60) {
@@ -360,24 +359,33 @@ export default function HomePage() {
         }
       })
       
-      // Add metadata to result
-      analysisResult.id = Date.now().toString()
-      analysisResult.uploadDate = new Date().toISOString()
-      analysisResult.files = files.map((f) => f.name)
-      analysisResult.isPrivate = true
-      analysisResult.likes = 0
-      analysisResult.saves = 0
-      analysisResult.comments = []
-      analysisResult.userId = userSessionId
-      analysisResult.originalText = combinedText // Store OCR text for AI detection
+      const analysisTimestamp = new Date().toISOString()
+      
+      analysisResult = {
+        ...baseAnalysis,
+        id: baseAnalysis.id || analysisStart.toString(),
+        studentName: baseAnalysis.studentName || "",
+        careerDirection: baseAnalysis.careerDirection || careerDirection || "미지정",
+        uploadDate: baseAnalysis.uploadDate || analysisTimestamp,
+        analyzedAt: baseAnalysis.analyzedAt || analysisTimestamp,
+        files: files.map((f) => f.name),
+        isPrivate: true,
+        likes: typeof baseAnalysis.likes === "number" ? baseAnalysis.likes : 0,
+        saves: typeof baseAnalysis.saves === "number" ? baseAnalysis.saves : 0,
+        comments: Array.isArray(baseAnalysis.comments) ? baseAnalysis.comments : [],
+        userId: baseAnalysis.userId || userSessionId,
+        originalText:
+          baseAnalysis.originalText && baseAnalysis.originalText.trim().length > 0
+            ? baseAnalysis.originalText
+            : combinedText,
+      }
       
     } catch (error) {
-      console.error('[Analysis Error]', error)
+      console.error("[Analysis Error]", error)
       
-      // Show error message and stop - DO NOT create fake results
       setPhase("idle")
       setProgressMessage("")
-      alert(`분석 중 오류가 발생했습니다.\n\n에러: ${error instanceof Error ? error.message : '알 수 없는 오류'}\n\n다시 시도해주세요.`)
+      alert(`분석 중 오류가 발생했습니다.\n\n에러: ${error instanceof Error ? error.message : "알 수 없는 오류"}\n\n다시 시도해주세요.`)
       return
     }
 
