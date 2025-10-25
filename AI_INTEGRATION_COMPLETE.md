@@ -18,12 +18,12 @@
   - ✅ 진로 적합성 분석
 
 **프롬프트 특징**:
-```
+\`\`\`
 - 한국어로 정확한 분석
 - 구조화된 JSON 응답
 - 구체적이고 실용적인 제안
 - 실제 교육부 지침 반영
-```
+\`\`\`
 
 #### AI 작성 탐지
 - **기능**: 생기부가 AI로 작성되었는지 정밀 분석
@@ -58,12 +58,12 @@
 - **API 키**: `K85664750088957`
 - **엔진**: OCR Engine 2 (한국어 지원 최적화)
 - **최적화 설정**:
-  ```javascript
+  \`\`\`javascript
   language: 'kor'              // 한국어 전용
   detectOrientation: true       // 자동 회전 감지
   scale: true                   // 작은 글씨 확대
   OCREngine: '2'               // 엔진 2 (한국어 최적)
-  ```
+  \`\`\`
 
 #### 특징
 - ✅ 작은 글씨도 정확하게 추출
@@ -77,14 +77,14 @@
 
 ### 로컬 테스트
 
-```bash
+\`\`\`bash
 # 1. 개발 서버 시작
 npm run dev
 
 # 2. http://localhost:3000 접속
 
 # 3. 테스트 시나리오
-```
+\`\`\`
 
 ### 테스트 시나리오
 
@@ -105,7 +105,7 @@ npm run dev
    - "자율 과제 추천" 클릭 → 프로젝트 제안
 
 #### 시나리오 2: OCR 정확도 테스트
-```
+\`\`\`
 테스트 이미지:
 - 고해상도 생기부 스캔본
 - 스마트폰으로 찍은 생기부
@@ -116,23 +116,23 @@ npm run dev
 - 한국어 텍스트 정확 추출
 - 특수문자 및 숫자 인식
 - 줄바꿈 유지
-```
+\`\`\`
 
 #### 시나리오 3: AI 응답 품질 확인
-```
+\`\`\`
 확인 사항:
 ✅ JSON 파싱 오류 없음
 ✅ 한국어로 명확한 응답
 ✅ 구체적이고 실용적인 제안
 ✅ 교육부 지침 정확히 반영
 ✅ 빠른 응답 속도 (5-10초)
-```
+\`\`\`
 
 ## 🔍 API 호출 확인
 
 ### 브라우저 개발자 도구에서 확인
 
-```javascript
+\`\`\`javascript
 // Console에서 다음 로그 확인
 
 // OCR 호출
@@ -156,7 +156,7 @@ npm run dev
 // 프로젝트 추천
 [Project Recommendation] Starting analysis...
 [Project Recommendation] Result: { bestProject: { ... } }
-```
+\`\`\`
 
 ## 🎯 API 사용량 모니터링
 
@@ -174,7 +174,7 @@ npm run dev
 
 ### OCR 실패 시
 
-```javascript
+\`\`\`javascript
 // 에러 메시지 확인
 [OCR Error] API error: 403
 → API 키 확인 필요
@@ -184,7 +184,7 @@ npm run dev
 
 [OCR Error] 텍스트를 추출할 수 없습니다
 → 이미지 품질 향상 필요
-```
+\`\`\`
 
 **해결 방법**:
 1. API 키 재확인
@@ -194,7 +194,7 @@ npm run dev
 
 ### Gemini API 오류
 
-```javascript
+\`\`\`javascript
 // 에러 메시지 확인
 [Gemini] API error: 400 Bad Request
 → 프롬프트 형식 확인
@@ -204,7 +204,7 @@ npm run dev
 
 [Gemini] JSON parse error
 → AI 응답 형식 확인, fallback 데이터 사용
-```
+\`\`\`
 
 **해결 방법**:
 1. API 키 유효성 확인
