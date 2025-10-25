@@ -6,7 +6,7 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 const GEMINI_API_ENDPOINT =
   "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent"
 
-export const maxDuration = 60
+export const maxDuration = 120 // Increased to 120 seconds for complex analysis
 
 interface GeminiCandidatePart {
   text?: string
@@ -262,9 +262,11 @@ function normalizeAnalysis(
 }
 
 export async function POST(request: NextRequest) {
+  console.log("[Analyze] === 분석 API 호출 시작 ===")
+  
   try {
     if (!GEMINI_API_KEY) {
-      console.error("[Analyze] Missing GEMINI_API_KEY environment variable")
+      console.error("[Analyze] ❌ Missing GEMINI_API_KEY environment variable")
       return NextResponse.json(
         { error: "서버에 Gemini API 키가 설정되지 않았습니다." },
         { status: 500 },
@@ -272,8 +274,11 @@ export async function POST(request: NextRequest) {
     }
 
     const { text, careerDirection }: AnalysisRequestBody = await request.json()
+    console.log(`[Analyze] 📄 받은 텍스트 길이: ${text?.length || 0} 글자`)
+    console.log(`[Analyze] 🎯 진로 방향: ${careerDirection || "미지정"}`)
 
     if (!text || typeof text !== "string" || text.trim().length === 0) {
+      console.error("[Analyze] ❌ 텍스트가 비어있음")
       return NextResponse.json(
         { error: "분석할 생기부 텍스트가 필요합니다." },
         { status: 400 },
@@ -281,8 +286,14 @@ export async function POST(request: NextRequest) {
     }
 
     const prompt = createAnalysisPrompt(text, careerDirection ?? "")
+    console.log(`[Analyze] 📝 프롬프트 생성 완료 (${prompt.length} 글자)`)    console.log("[Analyze] 🚀 Gemini API 호출 중...")
 
-    const response = await fetch(`${GEMINI_API_ENDPOINT}?key=${GEMINI_API_KEY}`, {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 60000) // 60 second timeout
+
+    let response: Response
+    try {
+      response = await fetch(`${GEMINI_API_ENDPOINT}?key=${GEMINI_API_KEY}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -322,58 +333,96 @@ export async function POST(request: NextRequest) {
           },
         ],
       }),
+      signal: controller.signal,
     })
+    clearTimeout(timeoutId)
+    } catch (fetchError) {
+      clearTimeout(timeoutId)
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        console.error("[Analyze] ⏱️ Gemini API 타임아웃")
+        return NextResponse.json(
+          { error: "AI 분석 시간이 초과되었습니다. 텍스트가 너무 길거나 서버가 혼잡합니다. 다시 시도해주세요." },
+          { status: 504 },
+        )
+      }
+      console.error("[Analyze] ❌ Fetch 오류:", fetchError)
+      throw fetchError
+    }
+
+    console.log(`[Analyze] ✅ Gemini API 응답 받음 (상태: ${response.status})`)
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error("[Analyze] Gemini API error", response.status, errorText)
+      console.error(`[Analyze] ❌ Gemini API 오류 (${response.status}):`, errorText)
       return NextResponse.json(
-        { error: "Gemini API 호출에 실패했습니다.", details: errorText },
+        { error: `Gemini API 호출에 실패했습니다 (${response.status}). 잠시 후 다시 시도해주세요.`, details: errorText },
         { status: 502 },
       )
     }
 
     const payload = (await response.json()) as GeminiResponse
+    console.log("[Analyze] 🔍 Gemini 응답 JSON 파싱 완료")
+    
     const generatedText = extractGeneratedText(payload)
+    console.log(`[Analyze] 📜 생성된 텍스트 길이: ${generatedText.length} 글자`)
 
     if (!generatedText) {
-      console.error("[Analyze] Gemini 응답에 텍스트가 없습니다.", payload)
+      console.error("[Analyze] ❌ Gemini 응답에 텍스트가 없습니다:", JSON.stringify(payload, null, 2))
       return NextResponse.json(
-        { error: "AI 응답에서 결과를 찾을 수 없습니다." },
+        { error: "AI 응답에서 결과를 찾을 수 없습니다. AI 서비스가 응답하지 않았습니다." },
         { status: 502 },
       )
     }
 
     const jsonBlock = extractJsonBlock(generatedText)
+    console.log("[Analyze] 🔧 JSON 블록 추출 시도...")
 
     if (!jsonBlock) {
-      console.error("[Analyze] Gemini 응답에서 JSON 블록을 찾을 수 없습니다.", generatedText)
+      console.error("[Analyze] ❌ JSON 블록 찾기 실패. 원본 응답:")
+      console.error(generatedText.substring(0, 500))
       return NextResponse.json(
-        { error: "AI 응답을 JSON으로 파싱할 수 없습니다.", raw: generatedText },
+        { error: "AI 응답을 JSON으로 파싱할 수 없습니다. AI가 예상치 못한 형식으로 응답했습니다.", raw: generatedText.substring(0, 500) },
         { status: 502 },
       )
     }
+    
+    console.log("[Analyze] ✅ JSON 블록 추출 성공")
 
     let parsed: GeminiAnalysis
 
     try {
       parsed = JSON.parse(jsonBlock) as GeminiAnalysis
+      console.log("[Analyze] ✅ JSON 파싱 성공")
+      console.log(`[Analyze] 📊 점수: ${parsed.overallScore}, 오류: ${parsed.errors?.length || 0}개, 강점: ${parsed.strengths?.length || 0}개`)
     } catch (error) {
-      console.error("[Analyze] JSON 파싱 오류", error, jsonBlock)
+      console.error("[Analyze] ❌ JSON 파싱 오류:", error)
+      console.error("[Analyze] 실패한 JSON:", jsonBlock.substring(0, 500))
       return NextResponse.json(
-        { error: "AI 응답을 JSON으로 파싱하는 중 오류가 발생했습니다.", raw: jsonBlock },
+        { error: "AI 응답을 JSON으로 파싱하는 중 오류가 발생했습니다. AI 응답 형식이 올바르지 않습니다.", raw: jsonBlock.substring(0, 500) },
         { status: 502 },
       )
     }
 
     const normalized = normalizeAnalysis(parsed, careerDirection ?? "", text)
+    console.log(`[Analyze] ✅ 정규화 완료 (ID: ${normalized.id})`)    console.log("[Analyze] === 분석 성공적으로 완료 ===")
 
     return NextResponse.json({ result: normalized, raw: generatedText })
   } catch (error) {
-    console.error("[Analyze] Unexpected error", error)
+    console.error("[Analyze] ❌❌❌ 예상치 못한 오류 발생 ❌❌❌")
+    console.error(error)
+    
+    const errorMessage = error instanceof Error ? error.message : "알 수 없는 오류"
+    const errorStack = error instanceof Error ? error.stack : undefined
+    
+    console.error("[Analyze] 오류 메시지:", errorMessage)
+    if (errorStack) {
+      console.error("[Analyze] 스택 트레이스:", errorStack)
+    }
+    
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : "생기부 분석 중 알 수 없는 오류가 발생했습니다.",
+        error: `생기부 분석 중 오류가 발생했습니다: ${errorMessage}`,
+        details: errorStack?.split('\n').slice(0, 3).join('\n'),
       },
       { status: 500 },
     )

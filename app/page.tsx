@@ -287,6 +287,9 @@ export default function HomePage() {
   }
 
   const startAnalysis = async (files: File[]) => {
+    console.log("[Page] === 분석 시작 ===")
+    console.log(`[Page] 📁 파일 개수: ${files.length}`)
+    
     setHasShownCompletion(false)
 
     if (typeof window !== "undefined") {
@@ -305,6 +308,7 @@ export default function HomePage() {
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
+      console.log(`[Page] 📄 OCR 처리 중 (${i + 1}/${totalFiles}): ${file.name}`)
 
       const fileProgressStart = (i / totalFiles) * 100
       const fileProgressEnd = ((i + 1) / totalFiles) * 100
@@ -317,15 +321,28 @@ export default function HomePage() {
           setOcrProgress(Math.min(99, fileProgress))
           
           // Update message from OCR service
-          if (progress.message) {
-            setProgressMessage(progress.message)
+          if (progress.status) {
+            setProgressMessage(progress.status)
           }
         })
         extractedTexts.push(text)
+        console.log(`[Page] ✅ OCR 완료 (${i + 1}/${totalFiles}): ${text.length} 글자`)
       } catch (error) {
-        console.error("[v0] OCR 오류:", error)
+        console.error(`[Page] ❌ OCR 오류 (파일 ${i + 1}):`, error)
         extractedTexts.push("")
       }
+    }
+
+    console.log(`[Page] 📊 전체 추출된 텍스트: ${extractedTexts.filter(t => t.length > 0).length}/${totalFiles} 성공`)
+
+    // Check if all OCR failed
+    const validTexts = extractedTexts.filter(t => t.trim().length > 0)
+    if (validTexts.length === 0) {
+      console.error("[Page] ❌ 모든 OCR이 실패함")
+      setPhase("idle")
+      setProgressMessage("")
+      alert("모든 이미지에서 텍스트를 추출할 수 없었습니다.\n\n• 이미지가 흐릿하거나 해상도가 낮은지 확인해주세요\n• 텍스트가 명확하게 보이는 이미지를 사용해주세요\n• 이미지 파일 크기를 줄여서 다시 시도해주세요")
+      return
     }
 
     setOcrProgress(100)
@@ -333,6 +350,7 @@ export default function HomePage() {
 
     setPhase("analyzing")
     setProgressMessage("AI가 생기부를 정밀하게 분석하는 중...")
+    console.log("[Page] 🤖 Gemini 분석 시작...")
 
     // Import Gemini service for real analysis
     const { analyzeSaenggibu } = await import("@/lib/gemini-service")
@@ -340,7 +358,9 @@ export default function HomePage() {
     let analysisResult: AnalysisResult
     
     try {
-      const combinedText = extractedTexts.join("\n\n")
+      const combinedText = extractedTexts.filter(t => t.trim().length > 0).join("\n\n")
+      console.log(`[Page] 📝 결합된 텍스트 길이: ${combinedText.length} 글자`)
+      
       const analysisStart = Date.now()
       
       const baseAnalysis = await analyzeSaenggibu(combinedText, careerDirection, (progress) => {
@@ -354,6 +374,9 @@ export default function HomePage() {
           setProgressMessage("종합 평가를 완성하는 중...")
         }
       })
+      
+      console.log(`[Page] ✅ Gemini 분석 완료 (${Date.now() - analysisStart}ms)`)
+      console.log(`[Page] 📊 점수: ${baseAnalysis.overallScore}, 오류: ${baseAnalysis.errors.length}개`)
       
       const analysisTimestamp = new Date().toISOString()
       
@@ -377,11 +400,29 @@ export default function HomePage() {
       }
       
     } catch (error) {
-      console.error("[Analysis Error]", error)
+      console.error("[Page] ❌❌❌ Analysis Error ❌❌❌")
+      console.error(error)
+      
+      const errorMessage = error instanceof Error ? error.message : "알 수 없는 오류"
+      console.error(`[Page] 에러 메시지: ${errorMessage}`)
       
       setPhase("idle")
       setProgressMessage("")
-      alert(`분석 중 오류가 발생했습니다.\n\n에러: ${error instanceof Error ? error.message : "알 수 없는 오류"}\n\n다시 시도해주세요.`)
+      
+      // More detailed error message for user
+      let userErrorMessage = "분석 중 오류가 발생했습니다.\n\n"
+      
+      if (errorMessage.includes("timeout") || errorMessage.includes("타임아웃")) {
+        userErrorMessage += "⏱️ AI 분석 시간이 초과되었습니다.\n\n• 텍스트가 너무 길 수 있습니다\n• 네트워크가 느릴 수 있습니다\n• 잠시 후 다시 시도해주세요"
+      } else if (errorMessage.includes("API") || errorMessage.includes("fetch")) {
+        userErrorMessage += "🔌 서버 연결에 문제가 있습니다.\n\n• 네트워크 연결을 확인해주세요\n• 잠시 후 다시 시도해주세요"
+      } else if (errorMessage.includes("JSON") || errorMessage.includes("파싱")) {
+        userErrorMessage += "🤖 AI 응답 처리 중 오류가 발생했습니다.\n\n• AI 서비스가 일시적으로 불안정할 수 있습니다\n• 잠시 후 다시 시도해주세요"
+      } else {
+        userErrorMessage += `에러: ${errorMessage}\n\n다시 시도해주세요.`
+      }
+      
+      alert(userErrorMessage)
       return
     }
 
