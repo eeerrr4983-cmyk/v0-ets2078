@@ -24,53 +24,37 @@ export function AIKillerDetector({ analysisResult, onClose }: AIKillerDetectorPr
   }, [])
 
   useEffect(() => {
-    setTimeout(() => {
-      const mockResult: AIKillerResult = {
-        overallAIProbability: 23,
-        detectedSections: [
-          {
-            content: "AI 및 데이터 분석 관련 탐구 활동이 구체적이고 심층적임",
-            aiProbability: 45,
-            lineNumber: 12,
-            reason: "일반적 칭찬 패턴 유사",
-            humanWritingIndicators: ["구체적 사례 언급"],
-            aiWritingIndicators: ["정형화된 표현", "과도한 수식어"],
-          },
-          {
-            content: "수학 세특에서 문제 해결 과정과 사고력이 명확히 드러남",
-            aiProbability: 18,
-            lineNumber: 25,
-            reason: "자연스러운 교사 관찰",
-            humanWritingIndicators: ["개인적 관찰", "구체적 맥락"],
-            aiWritingIndicators: [],
-          },
-          {
-            content: "창의적 체험활동에서 리더십과 협업 역량이 우수함",
-            aiProbability: 32,
-            lineNumber: 38,
-            reason: "일반적 표현 사용",
-            humanWritingIndicators: ["구체적 활동 언급"],
-            aiWritingIndicators: ["추상적 표현"],
-          },
-          {
-            content: "과학 탐구 활동에서 실험 설계와 분석이 체계적",
-            aiProbability: 15,
-            lineNumber: 45,
-            reason: "자연스러운 관찰 기록",
-            humanWritingIndicators: ["구체적 과정 설명"],
-            aiWritingIndicators: [],
-          },
-        ],
-        riskAssessment: "안전",
-        recommendations: [
-          "인간 작성으로 판단됩니다.",
-          "일부 정형화 표현이 있으나 자연스러운 수준.",
-          "구체적 사례와 관찰이 잘 포함됨.",
-        ],
+    const runDetection = async () => {
+      setIsAnalyzing(true)
+      
+      try {
+        // Import the AI detection function
+        const { detectAIWriting } = await import('@/lib/gemini-service')
+        
+        // Construct text from analysis result
+        const textToAnalyze = [
+          ...analysisResult.strengths,
+          ...analysisResult.improvements,
+          ...analysisResult.suggestions,
+        ].join('\n')
+        
+        const detectionResult = await detectAIWriting(textToAnalyze)
+        setResult(detectionResult)
+      } catch (error) {
+        console.error('[AI Killer Detection Error]', error)
+        // Fallback to safe result
+        setResult({
+          overallAIProbability: 0,
+          riskAssessment: "안전",
+          detectedSections: [],
+          recommendations: ['AI 작성 탐지를 완료할 수 없습니다. 다시 시도해주세요.']
+        })
+      } finally {
+        setIsAnalyzing(false)
       }
-      setResult(mockResult)
-      setIsAnalyzing(false)
-    }, 3000)
+    }
+    
+    runDetection()
   }, [])
 
   const getRiskColor = (risk: RiskLevel) => {

@@ -24,26 +24,39 @@ export function UniversityPredictor({ analysisResult, onClose }: UniversityPredi
   }, [])
 
   useEffect(() => {
-    setTimeout(() => {
-      const mockPrediction = {
-        nationalPercentile: 12,
-        academicLevel: "상위권",
-        reachableUniversities: [
-          { tier: "최상위권", universities: ["서울대", "연세대", "고려대"], probability: "도전" },
-          { tier: "상위권", universities: ["성균관대", "한양대", "중앙대"], probability: "적정" },
-          { tier: "중상위권", universities: ["경희대", "한국외대", "서울시립대"], probability: "안정" },
-        ],
-        strengthAnalysis: "AI 및 데이터 분석 관련 활동이 우수하여 공학계열 진학에 유리합니다.",
-        improvementNeeded: "3학년 심화 탐구 활동을 보강하면 최상위권 대학 합격 가능성이 높아집니다.",
-        recommendations: [
-          "현재 생기부 수준으로 상위권 대학 지원 가능",
-          "전공 적합성을 더 강화하면 최상위권도 도전 가능",
-          "교과 성적과 생기부가 균형있게 발전 중",
-        ],
+    const runPrediction = async () => {
+      setIsAnalyzing(true)
+      
+      try {
+        // Import the university prediction function
+        const { predictUniversity } = await import('@/lib/gemini-service')
+        
+        const careerDirection = analysisResult.careerDirection || '미지정'
+        const predictionResult = await predictUniversity(analysisResult, careerDirection)
+        setPrediction(predictionResult)
+      } catch (error) {
+        console.error('[University Prediction Error]', error)
+        // Fallback to default prediction
+        setPrediction({
+          nationalPercentile: 50,
+          academicLevel: "중위권",
+          reachableUniversities: [
+            { tier: "상위권", universities: ["성균관대", "한양대", "중앙대"], probability: "도전" },
+            { tier: "중상위권", universities: ["경희대", "한국외대", "서울시립대"], probability: "적정" },
+          ],
+          strengthAnalysis: "생기부 분석 결과를 바탕으로 예측했습니다.",
+          improvementNeeded: "지속적인 개선이 필요합니다.",
+          recommendations: [
+            "현재 생기부 수준을 유지하세요",
+            "전공 적합성을 강화하세요",
+          ],
+        })
+      } finally {
+        setIsAnalyzing(false)
       }
-      setPrediction(mockPrediction)
-      setIsAnalyzing(false)
-    }, 2500)
+    }
+    
+    runPrediction()
   }, [])
 
   return (

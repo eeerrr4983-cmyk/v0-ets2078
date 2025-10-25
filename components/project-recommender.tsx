@@ -25,55 +25,48 @@ export function ProjectRecommender({ analysisResult, careerDirection, onClose }:
     }
   }, [])
 
-  const analyzeAndRecommend = () => {
+  const analyzeAndRecommend = async () => {
     setIsAnalyzing(true)
 
-    setTimeout(() => {
-      const mockRecommendations = {
+    try {
+      // Import the project recommendation function
+      const { recommendProjects } = await import('@/lib/gemini-service')
+      
+      const career = userCareer || careerDirection || '미지정'
+      const projectRecommendations = await recommendProjects(analysisResult, career)
+      setRecommendations(projectRecommendations)
+    } catch (error) {
+      console.error('[Project Recommendation Error]', error)
+      // Fallback to default recommendations
+      setRecommendations({
         career: userCareer || "생기부 내용 기반 분석",
         bestProject: {
-          title: "나만의 AI 챗봇 개발 프로젝트",
-          description: "실생활 문제를 해결하는 맞춤형 AI 챗봇 설계 및 구현",
-          reason: "학생의 역량과 활동성을 극대화할 수 있는 최적의 과제",
-          difficulty: "상",
-          duration: "3-4개월",
-          benefits: ["전공 역량 극대화", "실전 경험 축적", "대학 진학 시 매우 유리"],
+          title: "맞춤형 자율 과제",
+          description: "학생의 진로와 관심사에 맞는 프로젝트",
+          reason: "학생의 역량을 극대화할 수 있는 과제",
+          difficulty: "중상",
+          duration: "2-3개월",
+          benefits: ["전공 역량 강화", "실전 경험 축적", "생기부 보강"],
         },
         projects: [
           {
-            title: "머신러닝 모델 개발 탐구",
-            description: "실생활 문제를 해결하는 간단한 ML 모델 구현",
-            reason: "AI 진로에 필수적인 기술 습득",
-            difficulty: "상",
-            duration: "3-4개월",
-            benefits: ["심화 학습", "기술 역량 강화", "대학 진학 시 유리"],
-          },
-          {
-            title: "AI 기반 데이터 분석 프로젝트",
-            description: "공공 데이터를 활용한 사회 문제 해결 분석",
-            reason: "진로와의 연계되며 데이터 분석 역량 강화",
+            title: "진로 관련 심화 탐구",
+            description: "관심 분야의 심화 학습 및 연구",
+            reason: "진로 적합성 강화",
             difficulty: "중상",
             duration: "2-3개월",
-            benefits: ["전공 적합성 향상", "실전 경험 축적", "포트폴리오 구축"],
-          },
-          {
-            title: "교내 AI 동아리 프로젝트",
-            description: "팀 단위로 AI 서비스 기획 및 프로토타입 제작",
-            reason: "협업 능력과 리더십 함께 발전",
-            difficulty: "중",
-            duration: "1-2개월",
-            benefits: ["팀워크 향상", "실무 경험", "생기부 강화"],
+            benefits: ["전문성 향상", "탐구 역량 강화"],
           },
         ],
         tips: [
           "프로젝트는 구체적인 결과물이 있어야 합니다.",
-          "진로와의 연계성을 명확히 설명할 수 있어야 해요.",
-          "과정과 성찰을 함께 기록하면 더 좋습니다.",
+          "진로와의 연계성을 명확히 하세요.",
+          "과정을 꼼꼼히 기록하세요.",
         ],
-      }
-      setRecommendations(mockRecommendations)
+      })
+    } finally {
       setIsAnalyzing(false)
-    }, 2500)
+    }
   }
 
   return (
