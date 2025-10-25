@@ -36,16 +36,19 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   })
 
   if (!response.ok) {
+    const responseText = await response.text()
+
     try {
-      const data = await response.json()
+      // Try to parse as JSON
+      const data = JSON.parse(responseText)
       const message = typeof data?.error === "string" ? data.error : response.statusText
       throw new ApiRequestError(response.status, message, data)
-    } catch (innerError) {
-      if (innerError instanceof ApiRequestError) {
-        throw innerError
+    } catch (parseError) {
+      // If JSON parsing fails, use the text as the error message
+      if (parseError instanceof ApiRequestError) {
+        throw parseError
       }
-      const fallbackMessage = await response.text()
-      throw new ApiRequestError(response.status, fallbackMessage || response.statusText)
+      throw new ApiRequestError(response.status, responseText || response.statusText)
     }
   }
 
@@ -268,14 +271,22 @@ function getReachableUniversities(percentile: number): UniversityTierRecommendat
     predicate: (item: UniversityDatasetItem) => boolean,
     probability: UniversityTierProbability,
   ) => {
-    const items = dataset.filter(predicate).slice(0, 3).map((item) => item.name)
+    const items = dataset
+      .filter(predicate)
+      .slice(0, 3)
+      .map((item) => item.name)
     if (items.length > 0) {
       results.push({ tier: tierName, universities: items, probability })
     }
   }
 
   if (percentile <= 15) {
-    pickUniversities(KOREAN_UNIVERSITY_DATA.top_tier, "최상위권 (SKY/특수대학)", (item) => item.requiredPercentile >= percentile * 0.5, "도전")
+    pickUniversities(
+      KOREAN_UNIVERSITY_DATA.top_tier,
+      "최상위권 (SKY/특수대학)",
+      (item) => item.requiredPercentile >= percentile * 0.5,
+      "도전",
+    )
   }
 
   if (percentile <= 25) {
@@ -339,7 +350,10 @@ function buildUniversityFallback(analysisResult: AnalysisResult, careerDirection
   }
 }
 
-export async function predictUniversity(analysisResult: AnalysisResult, careerDirection: string): Promise<UniversityPrediction> {
+export async function predictUniversity(
+  analysisResult: AnalysisResult,
+  careerDirection: string,
+): Promise<UniversityPrediction> {
   try {
     const response = await postJson<UniversityApiResponse>(API_ROUTES.university, {
       analysisResult,
@@ -399,7 +413,10 @@ function buildProjectFallback(analysisResult: AnalysisResult, careerDirection: s
   }
 }
 
-export async function recommendProjects(analysisResult: AnalysisResult, careerDirection: string): Promise<ProjectRecommendations> {
+export async function recommendProjects(
+  analysisResult: AnalysisResult,
+  careerDirection: string,
+): Promise<ProjectRecommendations> {
   try {
     const response = await postJson<ProjectApiResponse>(API_ROUTES.projects, {
       analysisResult,
