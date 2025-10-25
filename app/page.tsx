@@ -218,24 +218,20 @@ export default function HomePage() {
   }, [userSessionId])
 
   useEffect(() => {
-    if (phase === "ocr" || phase === "analyzing") {
+    // Select tip only once at the start of analysis
+    if ((phase === "ocr" || phase === "analyzing") && !currentTip) {
       const randomTip = PROGRESS_TIPS[Math.floor(Math.random() * PROGRESS_TIPS.length)]
       setCurrentTip(randomTip)
     }
-  }, [phase])
+  }, [phase, currentTip])
 
   useEffect(() => {
-    if (phase === "ocr" || phase === "analyzing") {
-      const messages = phase === "ocr" ? PROGRESS_MESSAGES.ocr : PROGRESS_MESSAGES.analyzing
-      let messageIndex = 0
-      setProgressMessage(messages[0])
-
-      const interval = setInterval(() => {
-        messageIndex = (messageIndex + 1) % messages.length
-        setProgressMessage(messages[messageIndex])
-      }, 2500)
-
-      return () => clearInterval(interval)
+    // Set initial message based on phase, but don't auto-rotate
+    // Messages will be updated by actual progress in handleAnalyze
+    if (phase === "ocr") {
+      setProgressMessage(PROGRESS_MESSAGES.ocr[0])
+    } else if (phase === "analyzing") {
+      setProgressMessage(PROGRESS_MESSAGES.analyzing[0])
     }
   }, [phase])
 
@@ -765,11 +761,12 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                               const isPast = index < currentImageIndex
                               const isFuture = index > currentImageIndex
                               
-                              // Calculate position offset for stacked effect
-                              const offsetX = isFuture ? (index - currentImageIndex) * 15 : 0
-                              const offsetY = isFuture ? (index - currentImageIndex) * 10 : 0
-                              const scale = isCurrent ? 1 : 0.95 - ((index - currentImageIndex) * 0.02)
+                              // Calculate position offset for stacked effect - more pronounced
+                              const offsetX = isFuture ? (index - currentImageIndex) * 20 : 0
+                              const offsetY = isFuture ? (index - currentImageIndex) * 12 : 0
+                              const scale = isCurrent ? 1 : 0.92 - ((index - currentImageIndex) * 0.03)
                               const zIndex = isCurrent ? 50 : (isFuture ? (100 - index) : 0)
+                              const brightness = isCurrent ? 1 : 0.85
                               
                               return (
                                 <motion.div
@@ -779,13 +776,14 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                                     x: offsetX,
                                     y: offsetY,
                                     scale: isPast ? 0 : scale,
-                                    opacity: isPast ? 0 : (isCurrent ? 1 : 0.6),
-                                    rotateY: isFuture ? (index - currentImageIndex) * 2 : 0,
+                                    opacity: isPast ? 0 : (isCurrent ? 1 : 0.7),
+                                    rotateY: isFuture ? (index - currentImageIndex) * 1.5 : 0,
                                   }}
                                   transition={{
                                     type: "spring",
-                                    stiffness: 260,
-                                    damping: 20,
+                                    stiffness: 300,
+                                    damping: 28,
+                                    mass: 0.8,
                                   }}
                                   onClick={() => {
                                     if (isFuture) {
@@ -802,52 +800,69 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                                   <img
                                     src={url || "/placeholder.svg"}
                                     alt={`생기부 ${index + 1}페이지`}
-                                    className="w-full h-full object-contain"
+                                    className="w-full h-full object-contain transition-all duration-300"
                                     style={{ 
-                                      filter: isCurrent ? 'brightness(0.92) contrast(1.05)' : 'brightness(0.8) contrast(0.9)',
+                                      filter: `brightness(${brightness}) contrast(1.02)`,
                                     }}
                                   />
                                   
-                                  {/* Border highlight for back cards */}
+                                  {/* Enhanced border highlight for back cards - more visible */}
                                   {isFuture && (
-                                    <div className="absolute inset-0 border-2 border-blue-400/50 rounded-lg pointer-events-none" />
+                                    <div className="absolute inset-0 border-2 border-blue-400/70 rounded-lg pointer-events-none shadow-lg" />
+                                  )}
+                                  
+                                  {/* Subtle glow on current card */}
+                                  {isCurrent && (
+                                    <div className="absolute inset-0 shadow-xl rounded-lg pointer-events-none" />
                                   )}
                                 </motion.div>
                               )
                             })}
                             
-                            {/* Image counter */}
-                            {uploadedImageUrls.length > 1 && (
-                              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[60] px-3 py-1 rounded-full bg-black/70 text-white text-xs font-medium backdrop-blur-sm shadow-lg">
-                                {currentImageIndex + 1} / {uploadedImageUrls.length}
-                              </div>
-                            )}
-                            
-                            {/* Premium scan effect (only on current image) */}
+                            {/* Subtle scan effect - Apple style */}
                             <motion.div
                               className="absolute inset-0 pointer-events-none rounded-lg"
                               style={{
-                                background: 'linear-gradient(180deg, transparent 0%, rgba(59, 130, 246, 0.12) 45%, rgba(96, 165, 250, 0.2) 50%, rgba(59, 130, 246, 0.12) 55%, transparent 100%)',
-                                height: '40%',
-                                filter: 'blur(2px)',
+                                background: 'linear-gradient(180deg, transparent 0%, rgba(59, 130, 246, 0.05) 45%, rgba(96, 165, 250, 0.08) 50%, rgba(59, 130, 246, 0.05) 55%, transparent 100%)',
+                                height: '30%',
+                                filter: 'blur(3px)',
                                 zIndex: 55,
                               }}
                               animate={{
-                                y: ["-50%", "150%"],
+                                y: ["-40%", "140%"],
                               }}
                               transition={{
-                                duration: 2.5,
+                                duration: 3.5,
                                 repeat: Infinity,
-                                ease: "easeInOut",
+                                ease: [0.4, 0, 0.2, 1],
                                 repeatType: "loop",
                               }}
                             />
                             
-                            {/* Corner highlights */}
-                            <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-blue-500/40 rounded-tl-lg z-[55]" />
-                            <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-blue-500/40 rounded-tr-lg z-[55]" />
-                            <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-blue-500/40 rounded-bl-lg z-[55]" />
-                            <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-blue-500/40 rounded-br-lg z-[55]" />
+                            {/* Minimal corner indicators - Apple style */}
+                            <div className="absolute top-3 left-3 w-3 h-3 border-t border-l border-gray-300/40 rounded-tl z-[55]" />
+                            <div className="absolute top-3 right-3 w-3 h-3 border-t border-r border-gray-300/40 rounded-tr z-[55]" />
+                            <div className="absolute bottom-3 left-3 w-3 h-3 border-b border-l border-gray-300/40 rounded-bl z-[55]" />
+                            <div className="absolute bottom-3 right-3 w-3 h-3 border-b border-r border-gray-300/40 rounded-br z-[55]" />
+                            
+                            {/* Subtle page indicator dots - Apple style */}
+                            {uploadedImageUrls.length > 1 && (
+                              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-[60] flex gap-1.5">
+                                {uploadedImageUrls.map((_, idx) => (
+                                  <motion.div
+                                    key={idx}
+                                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                                      idx === currentImageIndex 
+                                        ? 'w-6 bg-blue-500' 
+                                        : 'w-1.5 bg-gray-300/60'
+                                    }`}
+                                    initial={{ scale: 0.8, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    transition={{ delay: idx * 0.05 }}
+                                  />
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </GlassCard>
                       )}

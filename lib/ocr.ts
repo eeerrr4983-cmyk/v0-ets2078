@@ -14,66 +14,6 @@ const DEFAULT_PROGRESS_MESSAGES = {
   complete: "텍스트 추출이 완료되었어요!",
 }
 
-async function compressImageFile(file: File, maxSizeMB = 1): Promise<File> {
-  // If already small enough, return as-is
-  if (file.size < maxSizeMB * 1024 * 1024) {
-    return file
-  }
-
-  console.log("[v0] Compressing image:", file.name, "from", Math.round(file.size / 1024) + "KB")
-
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const img = new Image()
-      img.onload = () => {
-        // Calculate new dimensions (max 1920px)
-        const maxDim = 1920
-        let width = img.width
-        let height = img.height
-
-        if (width > maxDim || height > maxDim) {
-          const ratio = Math.min(maxDim / width, maxDim / height)
-          width = Math.floor(width * ratio)
-          height = Math.floor(height * ratio)
-        }
-
-        const canvas = document.createElement("canvas")
-        canvas.width = width
-        canvas.height = height
-        const ctx = canvas.getContext("2d")
-
-        if (!ctx) {
-          resolve(file)
-          return
-        }
-
-        ctx.drawImage(img, 0, 0, width, height)
-
-        canvas.toBlob(
-          (blob) => {
-            if (blob) {
-              const compressed = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), {
-                type: "image/jpeg",
-              })
-              console.log("[v0] Compressed to", Math.round(compressed.size / 1024) + "KB")
-              resolve(compressed)
-            } else {
-              resolve(file)
-            }
-          },
-          "image/jpeg",
-          0.85,
-        )
-      }
-      img.onerror = () => resolve(file)
-      img.src = e.target?.result as string
-    }
-    reader.onerror = () => resolve(file)
-    reader.readAsDataURL(file)
-  })
-}
-
 export async function extractTextFromImage(
   imageFile: File,
   onProgress?: (progress: OCRProgress) => void,
@@ -82,13 +22,16 @@ export async function extractTextFromImage(
     onProgress({ status: DEFAULT_PROGRESS_MESSAGES.uploading, progress: 5 })
   }
 
-  const compressedFile = await compressImageFile(imageFile, 1)
-
   const formData = new FormData()
-  formData.append("files", compressedFile)
+  formData.append("files", imageFile)
 
+  if (onProgress) {
+    onProgress({ status: "OCR.space 서버에 연결 중...", progress: 15 })
+  }
+
+  // Increase timeout and add abort controller
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 50000)
+  const timeoutId = setTimeout(() => controller.abort(), 90000) // 90 seconds
 
   try {
     const response = await fetch("/api/ocr", {
@@ -100,29 +43,29 @@ export async function extractTextFromImage(
     clearTimeout(timeoutId)
 
     if (onProgress) {
-      onProgress({ status: DEFAULT_PROGRESS_MESSAGES.requesting, progress: 35 })
+      onProgress({ status: "한국어 텍스트를 정밀하게 추출하는 중...", progress: 45 })
     }
 
     if (!response.ok) {
-      let errorMessage = "OCR 요청 실패"
-      try {
-        const errorData = await response.json()
-        errorMessage = errorData.error || errorMessage
-      } catch {
-        errorMessage = await response.text()
-      }
-      console.error("[v0] OCR 오류:", errorMessage)
-      throw new Error(errorMessage)
+      const errorMessage = await response.text()
+      throw new Error(errorMessage || "OCR 요청에 실패했습니다.")
+    }
+
+    if (onProgress) {
+      onProgress({ status: "텍스트 분석 중...", progress: 75 })
     }
 
     const data = (await response.json()) as OcrApiResponse
 
     if (data.error) {
-      console.error("[v0] OCR API 오류:", data.error)
       throw new Error(data.error)
     }
 
     const text = data.texts?.[0]?.trim() ?? ""
+
+    if (!text || text.length === 0) {
+      throw new Error("텍스트를 추출할 수 없습니다. 이미지 품질을 확인해주세요.")
+    }
 
     if (onProgress) {
       onProgress({ status: DEFAULT_PROGRESS_MESSAGES.complete, progress: 100 })
@@ -131,8 +74,8 @@ export async function extractTextFromImage(
     return text
   } catch (error) {
     clearTimeout(timeoutId)
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new Error("OCR 처리 시간 초과. 이미지를 더 작게 만들어주세요.")
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error("OCR 처리 시간이 초과되었습니다. 이미지 크기를 줄이거나 다시 시도해주세요.")
     }
     throw error
   }

@@ -47,10 +47,15 @@ export function Navigation() {
   }, [pathname])
 
   useEffect(() => {
-    // Hide profile icon on results pages OR when showing analysis results on home OR when modal is open
+    // Show profile icon ONLY on home (without results) and explore pages
+    const isHomePage = pathname === "/"
+    const isExplorePage = pathname === "/explore"
     const isResultsScreen = pathname === "/results" || pathname.startsWith("/results/")
-    const isShowingResults = pathname === "/" && hasResults
-    setShowProfileIcon(!isResultsScreen && !isShowingResults && !isModalOpen)
+    
+    // Profile should ONLY show on home (clean state) and explore
+    // Hide when: analyzing, showing results, on results page, or modal open
+    const shouldShowProfile = (isHomePage && !hasResults) || isExplorePage
+    setShowProfileIcon(shouldShowProfile && !isModalOpen && !isResultsScreen)
   }, [pathname, hasResults, isModalOpen])
   
   useEffect(() => {
