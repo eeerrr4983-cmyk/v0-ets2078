@@ -26,8 +26,15 @@ export function Navigation() {
     // Initial check
     checkResults()
     
-    // Custom event listener for immediate updates
-    const handleAnalysisChange = () => checkResults()
+    // Custom event listener for immediate updates (with detail support)
+    const handleAnalysisChange = (e: Event) => {
+      const customEvent = e as CustomEvent
+      if (customEvent.detail && typeof customEvent.detail.hasResults === 'boolean') {
+        setHasResults(customEvent.detail.hasResults)
+      } else {
+        checkResults()
+      }
+    }
     window.addEventListener('analysisStateChange', handleAnalysisChange)
     
     // Check on pathname change
@@ -98,7 +105,9 @@ export function Navigation() {
       if (typeof window !== 'undefined') {
         sessionStorage.removeItem('is_analyzing')
         sessionStorage.removeItem('current_analysis')
-        window.dispatchEvent(new CustomEvent('analysisStateChange'))
+        window.dispatchEvent(new CustomEvent('analysisStateChange', {
+          detail: { hasResults: false }
+        }))
       }
       router.push('/')
       window.scrollTo({ top: 0, behavior: 'smooth' })

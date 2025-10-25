@@ -68,13 +68,25 @@ const PROGRESS_MESSAGES = {
   ],
 }
 
+// Helper function to generate unique 4-digit student IDs
+const generateStudentId = (analysis: AnalysisResult, index: number): string => {
+  if (analysis.studentId && analysis.studentId.length === 4) {
+    return analysis.studentId
+  }
+  // Generate 4-digit ID based on timestamp (last 4 digits)
+  const timestamp = analysis.id || Date.now().toString()
+  const lastFourDigits = timestamp.slice(-4)
+  return lastFourDigits
+}
+
 // Helper function to generate AI-based titles for analysis history
 const generateAnalysisTitle = (analysis: AnalysisResult, index: number): string => {
+  const studentId = generateStudentId(analysis, index)
   if (analysis.studentName && analysis.studentName.trim()) {
-    return `${analysis.studentName}의 생기부`
+    return `학생${studentId}`
   }
-  // For anonymous users, generate unique student numbers
-  return `학생${index + 1}`
+  // For anonymous users, use generated student number
+  return `학생${studentId}`
 }
 
 // Helper function for smart time display
@@ -155,6 +167,7 @@ export default function HomePage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [showAnalysisComplete, setShowAnalysisComplete] = useState(false)
   const [hasShownCompletion, setHasShownCompletion] = useState(false)
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
 
   useEffect(() => {
     // Load from history (not from shared analyses)
@@ -368,13 +381,18 @@ export default function HomePage() {
       }
     }
 
-    // Show completion popup
+    // Show completion popup ONCE
     if (!hasShownCompletion) {
       setPhase("analysisComplete")
       setShowAnalysisComplete(true)
       setHasShownCompletion(true)
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      
+      // Wait for popup to display, then smoothly hide it
+      await new Promise((resolve) => setTimeout(resolve, 1800))
       setShowAnalysisComplete(false)
+      
+      // Small delay to allow exit animation to complete
+      await new Promise((resolve) => setTimeout(resolve, 400))
     }
 
     setAnalysisResult(analysisResult)
@@ -382,13 +400,13 @@ export default function HomePage() {
     
     // CRITICAL: Set analysis state immediately for navigation
     if (typeof window !== "undefined") {
-      sessionStorage.setItem("current_analysis", JSON.stringify(mockResult))
+      sessionStorage.setItem("current_analysis", JSON.stringify(analysisResult))
       sessionStorage.setItem("is_analyzing", "true")
       window.dispatchEvent(new CustomEvent("analysisStateChange"))
     }
     
     // Save to history immediately (even without sharing)
-    StorageManager.saveToHistory(mockResult)
+    StorageManager.saveToHistory(analysisResult)
     
     // Reload history to show in "나의 최근 활동"
     setAnalysisHistory(StorageManager.getAnalysisHistory().slice(0, 3))
@@ -468,9 +486,11 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
     const a = document.createElement("a")
     a.href = url
     const now = new Date()
-    const month = now.getMonth() + 1
-    const day = now.getDate()
-    a.download = `생기부AI분석결과_${month}/${day}.txt`
+    const month = String(now.getMonth() + 1).padStart(2, '0')
+    const day = String(now.getDate()).padStart(2, '0')
+    const hour = String(now.getHours()).padStart(2, '0')
+    const minute = String(now.getMinutes()).padStart(2, '0')
+    a.download = `생기부분석결과_${month}${day}_${hour}${minute}.txt`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -485,8 +505,16 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
     setProgressMessage("")
     setCurrentTip("")
     setCareerDirection("")
-    // sessionStorage.removeItem("current_analysis")
-    // sessionStorage.removeItem("is_analyzing")
+    sessionStorage.removeItem("current_analysis")
+    sessionStorage.removeItem("is_analyzing")
+    
+    // Dispatch event to update navigation state
+    window.dispatchEvent(new CustomEvent("analysisStateChange", {
+      detail: { hasResults: false }
+    }))
+    
+    // Force navigation to home (ensuring bottom navigation also updates)
+    window.scrollTo({ top: 0, behavior: "smooth" })
   }
 
   const isFixedScreen =
@@ -723,19 +751,81 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                       {uploadedImageUrls.length > 0 && (
                         <GlassCard className="p-2 relative overflow-hidden rounded-2xl">
                           <div className="relative h-72">
-                            <img
-                              src={uploadedImageUrls[0] || "/placeholder.svg"}
-                              alt="업로드된 생기부"
-                              className="w-full h-full object-contain rounded-lg"
-                              style={{ filter: 'brightness(0.92) contrast(1.05)' }}
-                            />
-                            {/* Premium scan effect with multiple layers */}
+                            <AnimatePresence mode="wait">
+                              {uploadedImageUrls.map((url, index) => {
+                                const isCurrent = index === currentImageIndex
+                                const offset = index - currentImageIndex
+                                
+                                return (
+                                  <motion.div
+                                    key={url}
+                                    initial={false}
+                                    animate={{
+                                      x: offset * 100 + '%',
+                                      scale: isCurrent ? 1 : 0.9,
+                                      opacity: isCurrent ? 1 : 0.3,
+                                      zIndex: isCurrent ? 10 : uploadedImageUrls.length - Math.abs(offset),
+                                    }}
+                                    transition={{
+                                      type: "spring",
+                                      stiffness: 300,
+                                      damping: 30,
+                                    }}
+                                    className="absolute inset-0"
+                                    style={{
+                                      pointerEvents: isCurrent ? 'auto' : 'none',
+                                    }}
+                                  >
+                                    <img
+                                      src={url || "/placeholder.svg"}
+                                      alt={`업로드된 생기부 ${index + 1}`}
+                                      className="w-full h-full object-contain rounded-lg"
+                                      style={{ filter: 'brightness(0.92) contrast(1.05)' }}
+                                    />
+                                  </motion.div>
+                                )
+                              })}
+                            </AnimatePresence>
+                            
+                            {/* Navigation arrows (only show if multiple images) */}
+                            {uploadedImageUrls.length > 1 && (
+                              <>
+                                {currentImageIndex > 0 && (
+                                  <button
+                                    onClick={() => setCurrentImageIndex(prev => prev - 1)}
+                                    className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-all"
+                                  >
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                    </svg>
+                                  </button>
+                                )}
+                                {currentImageIndex < uploadedImageUrls.length - 1 && (
+                                  <button
+                                    onClick={() => setCurrentImageIndex(prev => prev + 1)}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-black/60 hover:bg-black/80 rounded-full flex items-center justify-center text-white transition-all"
+                                  >
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                  </button>
+                                )}
+                                
+                                {/* Image counter */}
+                                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 px-3 py-1 rounded-full bg-black/60 text-white text-xs font-medium backdrop-blur-sm">
+                                  {currentImageIndex + 1} / {uploadedImageUrls.length}
+                                </div>
+                              </>
+                            )}
+                            
+                            {/* Premium scan effect with multiple layers (only on current image) */}
                             <motion.div
                               className="absolute inset-0 pointer-events-none"
                               style={{
                                 background: 'linear-gradient(180deg, transparent 0%, rgba(59, 130, 246, 0.12) 45%, rgba(96, 165, 250, 0.2) 50%, rgba(59, 130, 246, 0.12) 55%, transparent 100%)',
                                 height: '40%',
                                 filter: 'blur(2px)',
+                                zIndex: 15,
                               }}
                               animate={{
                                 y: ["-50%", "150%"],
@@ -753,6 +843,7 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                               style={{
                                 background: 'linear-gradient(180deg, transparent 40%, rgba(255, 255, 255, 0.15) 50%, transparent 60%)',
                                 height: '25%',
+                                zIndex: 15,
                               }}
                               animate={{
                                 y: ["-30%", "130%"],
@@ -766,10 +857,10 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                               }}
                             />
                             {/* Corner highlights */}
-                            <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-blue-500/40 rounded-tl-lg" />
-                            <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-blue-500/40 rounded-tr-lg" />
-                            <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-blue-500/40 rounded-bl-lg" />
-                            <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-blue-500/40 rounded-br-lg" />
+                            <div className="absolute top-2 left-2 w-4 h-4 border-t-2 border-l-2 border-blue-500/40 rounded-tl-lg z-15" />
+                            <div className="absolute top-2 right-2 w-4 h-4 border-t-2 border-r-2 border-blue-500/40 rounded-tr-lg z-15" />
+                            <div className="absolute bottom-2 left-2 w-4 h-4 border-b-2 border-l-2 border-blue-500/40 rounded-bl-lg z-15" />
+                            <div className="absolute bottom-2 right-2 w-4 h-4 border-b-2 border-r-2 border-blue-500/40 rounded-br-lg z-15" />
                           </div>
                         </GlassCard>
                       )}
@@ -1057,10 +1148,18 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
 
                   <div className="space-y-2">
                     <div>
-                      <label className="text-xs font-medium text-gray-700 mb-1 block">학번</label>
+                      <label className="text-xs font-medium text-gray-700 mb-1 block">학번 (4자리 숫자)</label>
                       <Input
                         value={shareData.studentId}
-                        onChange={(e) => setShareData({ ...shareData, studentId: e.target.value })}
+                        onChange={(e) => {
+                          const value = e.target.value
+                          // Only allow 4-digit numbers
+                          if (value === '' || (/^\d{1,4}$/.test(value))) {
+                            setShareData({ ...shareData, studentId: value })
+                          }
+                        }}
+                        maxLength={4}
+                        placeholder="예: 2401"
                         className="h-9 text-sm"
                       />
                     </div>
