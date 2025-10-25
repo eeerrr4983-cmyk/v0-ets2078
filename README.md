@@ -45,7 +45,7 @@
 
 ## 📦 설치 및 실행
 
-```bash
+\`\`\`bash
 # 의존성 설치
 npm install --legacy-peer-deps
 
@@ -61,19 +61,19 @@ npm run build
 
 # 프로덕션 서버 실행
 npm start
-```
+\`\`\`
 
 ## 🔑 환경 변수
 
 `.env.local` 파일에 다음 환경 변수를 설정하세요:
 
-```bash
+\`\`\`bash
 # Google Gemini 2.5 Flash-Lite API key
 GEMINI_API_KEY=your_gemini_api_key_here
 
 # OCR.space API key (Korean optimized)
 OCR_SPACE_API_KEY=your_ocr_space_api_key_here
-```
+\`\`\`
 
 ## 🎯 주요 API 엔드포인트
 

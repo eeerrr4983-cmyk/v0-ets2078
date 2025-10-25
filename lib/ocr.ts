@@ -35,13 +35,21 @@ export async function extractTextFromImage(
   }
 
   if (!response.ok) {
-    const errorMessage = await response.text()
-    throw new Error(errorMessage || "OCR 요청에 실패했습니다.")
+    let errorMessage = "OCR 요청에 실패했습니다."
+    try {
+      const errorData = await response.json()
+      errorMessage = errorData.error || errorMessage
+    } catch {
+      errorMessage = await response.text()
+    }
+    console.error("[v0] OCR 오류:", errorMessage)
+    throw new Error(errorMessage)
   }
 
   const data = (await response.json()) as OcrApiResponse
 
   if (data.error) {
+    console.error("[v0] OCR API 오류:", data.error)
     throw new Error(data.error)
   }
 

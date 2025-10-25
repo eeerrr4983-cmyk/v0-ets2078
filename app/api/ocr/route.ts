@@ -53,13 +53,29 @@ export async function POST(request: NextRequest) {
         body: ocrForm,
       })
 
+      const contentType = response.headers.get("content-type")
+      const isJson = contentType?.includes("application/json")
+
       if (!response.ok) {
         const errorText = await response.text()
         console.error("[OCR] API error response", response.status, errorText)
-        throw new Error(`OCR.space API 실패 (status: ${response.status})`)
+        throw new Error(`OCR.space API 실패 (status: ${response.status}): ${errorText.substring(0, 100)}`)
       }
 
-      const data = (await response.json()) as OcrSpaceResult
+      if (!isJson) {
+        const textResponse = await response.text()
+        console.error("[OCR] Non-JSON response received:", textResponse.substring(0, 200))
+        throw new Error(`OCR.space API가 예상치 못한 응답을 반환했습니다: ${textResponse.substring(0, 100)}`)
+      }
+
+      let data: OcrSpaceResult
+      try {
+        data = (await response.json()) as OcrSpaceResult
+      } catch (parseError) {
+        const rawText = await response.text()
+        console.error("[OCR] JSON parse error. Raw response:", rawText.substring(0, 200))
+        throw new Error(`OCR 응답을 파싱할 수 없습니다. API 키를 확인해주세요.`)
+      }
 
       if (data.IsErroredOnProcessing) {
         const message = Array.isArray(data.ErrorMessage)
@@ -71,14 +87,14 @@ export async function POST(request: NextRequest) {
 
       const parsedText = data.ParsedResults?.map((item) => item.ParsedText ?? "").join("\n\n") ?? ""
       const cleanedText = parsedText.trim()
-      
+
       console.log("[OCR] Extracted text length:", cleanedText.length, "characters")
       console.log("[OCR] First 200 characters:", cleanedText.substring(0, 200))
-      
+
       if (cleanedText.length === 0) {
         console.warn("[OCR] Warning: Empty text extracted from", file.name)
       }
-      
+
       results.push(cleanedText)
     }
 
