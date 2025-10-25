@@ -56,44 +56,46 @@ export class StorageManager {
     }
   }
 
-  // 트렌딩 분석 결과 계산
+  // 트렌딩 분석 결과 계산 (비공개 제외)
   static getTrendingAnalyses(): AnalysisResult[] {
     const results = this.getAllAnalyses()
     const now = Date.now()
     const oneDayAgo = now - 24 * 60 * 60 * 1000
 
     return results
-      .filter((result) => new Date(result.uploadDate).getTime() > oneDayAgo)
+      .filter((result) => !result.isPrivate && new Date(result.uploadDate).getTime() > oneDayAgo)
       .sort((a, b) => b.likes - a.likes)
       .slice(0, 3)
   }
 
-  // 개인화 추천 알고리즘
+  // 개인화 추천 알고리즘 (비공개 제외)
   static getPersonalizedRecommendations(searchQuery: string): AnalysisResult[] {
     const results = this.getAllAnalyses()
     const interaction = this.getInteraction()
 
-    const scored = results.map((result) => {
-      let score = 0
+    const scored = results
+      .filter((result) => !result.isPrivate) // 비공개 결과 제외
+      .map((result) => {
+        let score = 0
 
-      // 검색어 매칭
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase()
-        if (result.studentName.toLowerCase().includes(query)) score += 10
-        if (result.strengths.some((s) => s.toLowerCase().includes(query))) score += 5
-        if (result.improvements.some((i) => i.toLowerCase().includes(query))) score += 3
-      }
+        // 검색어 매칭
+        if (searchQuery) {
+          const query = searchQuery.toLowerCase()
+          if (result.studentName.toLowerCase().includes(query)) score += 10
+          if (result.strengths.some((s) => s.toLowerCase().includes(query))) score += 5
+          if (result.improvements.some((i) => i.toLowerCase().includes(query))) score += 3
+        }
 
-      // 인기도
-      score += result.likes * 2
-      score += result.saves * 3
+        // 인기도
+        score += result.likes * 2
+        score += result.saves * 3
 
-      // 최신성
-      const daysSinceCreation = (Date.now() - new Date(result.uploadDate).getTime()) / (1000 * 60 * 60 * 24)
-      score += Math.max(0, 10 - daysSinceCreation)
+        // 최신성
+        const daysSinceCreation = (Date.now() - new Date(result.uploadDate).getTime()) / (1000 * 60 * 60 * 24)
+        score += Math.max(0, 10 - daysSinceCreation)
 
-      return { result, score }
-    })
+        return { result, score }
+      })
 
     return scored
       .sort((a, b) => b.score - a.score)
@@ -122,5 +124,19 @@ export class StorageManager {
   static getPublicAnalyses(): AnalysisResult[] {
     const allAnalyses = this.getAllAnalyses()
     return allAnalyses.filter((analysis) => !analysis.isPrivate)
+  }
+
+  // 사용자가 볼 수 있는 분석 결과 가져오기 (공개 + 자신의 비공개)
+  static getViewableAnalyses(userId: string): AnalysisResult[] {
+    const allAnalyses = this.getAllAnalyses()
+    return allAnalyses.filter((analysis) => !analysis.isPrivate || analysis.userId === userId)
+  }
+
+  // 분석 결과 접근 권한 확인
+  static canViewAnalysis(analysisId: string, userId: string): boolean {
+    const analysis = this.getAllAnalyses().find((a) => a.id === analysisId)
+    if (!analysis) return false
+    if (!analysis.isPrivate) return true
+    return analysis.userId === userId
   }
 }
