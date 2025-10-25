@@ -3,8 +3,9 @@ import type { NextRequest } from "next/server"
 import { randomUUID } from "crypto"
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY
+// Using Gemini 1.5 Flash (stable, production-ready model)
 const GEMINI_API_ENDPOINT =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent"
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
 
 export const maxDuration = 120 // Increased to 120 seconds for complex analysis
 

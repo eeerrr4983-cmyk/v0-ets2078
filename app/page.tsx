@@ -608,19 +608,17 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                   transition={{ duration: 0.3 }}
                   className="space-y-3"
                 >
-                  <GlassCard className="p-2.5">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <Compass className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-xs font-semibold text-gray-900">진로방향</h3>
-                        <p className="text-[9px] text-gray-500 leading-tight">선택 입력 - 더 정밀한 분석</p>
-                      </div>
+                  <GlassCard className="p-2 space-y-1">
+                    <div className="flex items-center gap-1.5">
+                      <Compass className="w-3 h-3 text-blue-600" />
+                      <h3 className="text-[11px] font-semibold text-gray-900">진로방향 설계</h3>
                     </div>
+                    <p className="text-[9px] text-gray-600">나의 진학목표를 입력시 더 정밀한 분석을 받아볼수있어요.</p>
                     <Input
-                      placeholder="예: 의학계열, 공학계열, 인문사회..."
+                      placeholder=""
                       value={careerDirection}
                       onChange={(e) => setCareerDirection(e.target.value)}
-                      className="h-8 text-xs border-gray-200/60 focus:border-blue-400"
+                      className="h-6 text-xs"
                     />
                   </GlassCard>
 
@@ -772,12 +770,11 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                           <div className="flex justify-center py-2">
                             <motion.div
                               className="w-8 h-8 border-4 border-gray-200 border-t-gray-800 rounded-full"
-                              animate={{ rotate: 360 }}
+                              animate={{ rotate: [0, 360] }}
                               transition={{
                                 duration: 0.8,
                                 repeat: Infinity,
                                 ease: "linear",
-                                repeatType: "loop",
                               }}
                               style={{
                                 willChange: "transform",
@@ -1333,12 +1330,11 @@ function ProcessCard({ icon: Icon, title, active, complete }: ProcessCardProps) 
       <div className="flex justify-center">
         {active && !complete ? (
           <motion.div
-            animate={{ rotate: 360 }}
+            animate={{ rotate: [0, 360] }}
             transition={{
               duration: 1,
               repeat: Infinity,
               ease: "linear",
-              repeatType: "loop",
             }}
             style={{
               willChange: "transform",

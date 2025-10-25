@@ -55,14 +55,16 @@ export function Navigation() {
     // Check if currently analyzing (uploading, ocr, analyzing phases)
     const isAnalyzing = typeof window !== 'undefined' && sessionStorage.getItem("is_analyzing") === "true"
     
-    // Profile should ONLY show on:
+    // CRITICAL: Profile should ONLY show on:
     // 1. Home page WITHOUT results AND NOT analyzing
-    // 2. Explore page (always)
+    // 2. Explore page ONLY
     // Hide when: analyzing, showing results, on results page, or modal open
-    const shouldShowProfile = (isHomePage && !hasResults && !isAnalyzing) || isExplorePage
-    setShowProfileIcon(shouldShowProfile && !isModalOpen && !isResultsScreen)
+    // NEVER show during analysis or when results exist
+    const shouldShowProfile = isExplorePage || (isHomePage && !hasResults && !isAnalyzing)
+    const finalVisibility = shouldShowProfile && !isModalOpen && !isResultsScreen && !hasResults && !isAnalyzing
+    setShowProfileIcon(finalVisibility)
     
-    console.log(`[Navigation] Profile visibility: ${shouldShowProfile && !isModalOpen && !isResultsScreen} (hasResults: ${hasResults}, isAnalyzing: ${isAnalyzing}, pathname: ${pathname})`)
+    console.log(`[Navigation] Profile: ${finalVisibility} (path: ${pathname}, hasResults: ${hasResults}, analyzing: ${isAnalyzing})`)
   }, [pathname, hasResults, isModalOpen])
   
   useEffect(() => {
@@ -153,7 +155,7 @@ export function Navigation() {
 
   return (
     <>
-      {user?.isGuest && showProfileIcon && (pathname === "/" || pathname === "/explore") && (
+      {user?.isGuest && showProfileIcon && !hasResults && pathname === "/explore" && (
         <div className="fixed top-4 right-4 z-50">
           <motion.button
             onClick={handleGuestProfileClick}
