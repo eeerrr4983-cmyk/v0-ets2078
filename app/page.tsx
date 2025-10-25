@@ -519,7 +519,7 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
               transition={{ duration: 0.5 }}
               className="text-center mb-3"
             >
-              <h1 className="text-2xl font-semibold tracking-tight text-gray-900 mb-0.5">생기부 AI</h1>
+              <h1 className="text-2xl font-bold tracking-tight text-gray-900 mb-0.5" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif' }}>사상고 생기부AI</h1>
               <p className="text-xs text-gray-500 font-normal">학생 생활기록부 AI 탐지기</p>
             </motion.div>
           )}
@@ -565,7 +565,7 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                       <Upload className="w-6 h-6 text-gray-700" />
                     </motion.div>
                     <div className="space-y-1.5">
-                      <h3 className="text-base font-semibold text-gray-900">생기부 AI 시작</h3>
+                      <h3 className="text-base font-semibold text-gray-900">사상고 생기부AI 시작</h3>
                       <p className="text-xs text-gray-600 leading-relaxed">생기부를 업로드하여 시작하세요.</p>
                     </div>
                     <input
