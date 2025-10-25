@@ -294,6 +294,10 @@ export default function HomePage() {
 
     if (typeof window !== "undefined") {
       sessionStorage.setItem("is_analyzing", "true")
+      // Dispatch event to hide profile icon and update navigation
+      window.dispatchEvent(new CustomEvent("analysisStateChange", {
+        detail: { hasResults: false }
+      }))
     }
 
     setPhase("uploading")

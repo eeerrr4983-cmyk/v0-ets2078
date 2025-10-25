@@ -52,10 +52,17 @@ export function Navigation() {
     const isExplorePage = pathname === "/explore"
     const isResultsScreen = pathname === "/results" || pathname.startsWith("/results/")
     
-    // Profile should ONLY show on home (clean state) and explore
+    // Check if currently analyzing (uploading, ocr, analyzing phases)
+    const isAnalyzing = typeof window !== 'undefined' && sessionStorage.getItem("is_analyzing") === "true"
+    
+    // Profile should ONLY show on:
+    // 1. Home page WITHOUT results AND NOT analyzing
+    // 2. Explore page (always)
     // Hide when: analyzing, showing results, on results page, or modal open
-    const shouldShowProfile = (isHomePage && !hasResults) || isExplorePage
+    const shouldShowProfile = (isHomePage && !hasResults && !isAnalyzing) || isExplorePage
     setShowProfileIcon(shouldShowProfile && !isModalOpen && !isResultsScreen)
+    
+    console.log(`[Navigation] Profile visibility: ${shouldShowProfile && !isModalOpen && !isResultsScreen} (hasResults: ${hasResults}, isAnalyzing: ${isAnalyzing}, pathname: ${pathname})`)
   }, [pathname, hasResults, isModalOpen])
   
   useEffect(() => {
