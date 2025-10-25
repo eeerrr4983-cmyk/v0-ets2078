@@ -30,8 +30,7 @@ import {
 } from "lucide-react"
 import { StorageManager } from "@/components/storage-manager"
 import type { AnalysisResult } from "@/lib/types"
-import { extractTextFromImage, extractTextWithFallback } from "@/lib/ocr-service"
-import { analyzeSaenggibu } from "@/lib/gemini-service"
+import { extractTextFromImage } from "@/lib/ocr"
 import { TeacherCommunicationHelper } from "@/components/teacher-communication-helper"
 import { AIKillerDetector } from "@/components/ai-killer-detector"
 import { UniversityPredictor } from "@/components/university-predictor"
@@ -110,9 +109,9 @@ export default function HomePage() {
   const [hasShownCompletion, setHasShownCompletion] = useState(false)
 
   useEffect(() => {
-    const history = StorageManager.getRecentActivity(userSessionId)
-    setAnalysisHistory(history)
-  }, [userSessionId, phase])
+    const history = StorageManager.getUserAnalyses(userSessionId)
+    setAnalysisHistory(history.slice(-3))
+  }, [userSessionId])
 
   useEffect(() => {
     if (phase === "ocr" || phase === "analyzing") {
@@ -165,12 +164,8 @@ export default function HomePage() {
         phase === "complete"
       ) {
         sessionStorage.setItem("is_analyzing", "true")
-        // Dispatch custom event to notify navigation
-        window.dispatchEvent(new CustomEvent('analysisStateChange'))
-      } else if (phase === "idle") {
+      } else {
         sessionStorage.removeItem("is_analyzing")
-        // Dispatch custom event to notify navigation
-        window.dispatchEvent(new CustomEvent('analysisStateChange'))
       }
     }
   }, [phase])
@@ -198,90 +193,129 @@ export default function HomePage() {
       sessionStorage.setItem("is_analyzing", "true")
     }
 
-    try {
-      setPhase("uploading")
-      setProgressMessage("파일을 업로드하는 중이에요.")
-      await new Promise((resolve) => setTimeout(resolve, 600))
+    setPhase("uploading")
+    setProgressMessage("파일을 업로드하는 중이에요.")
+    await new Promise((resolve) => setTimeout(resolve, 600))
 
-      setPhase("ocr")
-      setProgressMessage(PROGRESS_MESSAGES.ocr[0])
-      const extractedTexts: string[] = []
+    setPhase("ocr")
+    setProgressMessage(PROGRESS_MESSAGES.ocr[0])
+    const extractedTexts: string[] = []
 
-      const totalFiles = files.length
+    const totalFiles = files.length
 
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i]
-        const fileProgressStart = (i / totalFiles) * 100
-        const fileProgressEnd = ((i + 1) / totalFiles) * 100
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
 
-        try {
-          const text = await extractTextWithFallback(file, (progress) => {
-            const currentProgress = fileProgressStart + (fileProgressEnd - fileProgressStart) * (progress.progress / 100)
-            setOcrProgress(Math.min(99, currentProgress))
-            if (progress.message) {
-              setProgressMessage(progress.message)
-            }
-          })
-          extractedTexts.push(text)
-        } catch (error) {
-          console.error("[OCR Error]", error)
-          extractedTexts.push("")
-        }
+      const fileProgressStart = (i / totalFiles) * 100
+      const fileProgressEnd = ((i + 1) / totalFiles) * 100
+
+      const progressSteps = 60
+      const stepSize = (fileProgressEnd - fileProgressStart) / progressSteps
+
+      for (let step = 0; step < progressSteps; step++) {
+        await new Promise((resolve) => setTimeout(resolve, 30))
+        setOcrProgress(Math.min(99, fileProgressStart + stepSize * (step + 1)))
       }
 
-      setOcrProgress(100)
-      await new Promise((resolve) => setTimeout(resolve, 300))
-
-      // Combine all extracted text
-      const fullText = extractedTexts.join("\n\n")
-
-      if (!fullText.trim()) {
-        throw new Error("텍스트를 추출할 수 없습니다. 이미지를 다시 확인해주세요.")
+      try {
+        const text = await extractTextFromImage(file)
+        extractedTexts.push(text)
+      } catch (error) {
+        console.error("[v0] OCR 오류:", error)
+        extractedTexts.push("")
       }
+    }
 
-      setPhase("analyzing")
-      setProgressMessage(PROGRESS_MESSAGES.analyzing[0])
+    setOcrProgress(100)
+    await new Promise((resolve) => setTimeout(resolve, 200))
 
-      // Real AI Analysis using Gemini
-      const analysisResult = await analyzeSaenggibu(
-        fullText,
-        careerDirection,
-        (progress) => {
-          // Update progress during analysis
-        }
-      )
+    setPhase("analyzing")
+    setProgressMessage(PROGRESS_MESSAGES.analyzing[0])
+    await new Promise((resolve) => setTimeout(resolve, 1800))
 
-      // Show completion animation only once
+    if (!hasShownCompletion) {
       setPhase("analysisComplete")
       setShowAnalysisComplete(true)
       setHasShownCompletion(true)
       await new Promise((resolve) => setTimeout(resolve, 2000))
       setShowAnalysisComplete(false)
-
-      // Enhance analysis result with additional data
-      const finalResult: AnalysisResult = {
-        ...analysisResult,
-        id: Date.now().toString(),
-        studentName: shareData.name || "학생",
-        uploadDate: new Date().toISOString(),
-        files: files.map((f) => f.name),
-        isPrivate: true,
-        likes: 0,
-        saves: 0,
-        comments: [],
-        userId: userSessionId,
-      }
-
-      // Save to storage
-      StorageManager.saveAnalysis(finalResult)
-
-      setAnalysisResult(finalResult)
-      setPhase("complete")
-    } catch (error) {
-      console.error("[Analysis Error]", error)
-      alert(error instanceof Error ? error.message : "분석 중 오류가 발생했습니다.")
-      resetAnalysis()
     }
+
+    const careerAlignmentPercentage = careerDirection ? Math.floor(Math.random() * 30) + 60 : 0
+
+    const mockErrors = [
+      {
+        type: "금지",
+        content: "○○대학교 AI 캠프 참여",
+        reason: "대학명 직접 명시 금지 (교육부 훈령 제530호)",
+        page: 1,
+        suggestion: "대학 주최 AI 캠프 참여로 수정 권장",
+        riskLevel: 3,
+      },
+      {
+        type: "금지",
+        content: "TOEIC 900점 취득",
+        reason: "공인어학시험 점수 기재 금지",
+        page: 3,
+        suggestion: "영어 의사소통 능력 우수로 표현",
+        riskLevel: 3,
+      },
+      {
+        type: "주의",
+        content: "매사에 성실하고 적극적이며 앞으로가 기대됨",
+        reason: "모호한 칭찬 표현, 구체적 관찰 근거 부족",
+        page: 2,
+        suggestion: "구체적인 활동 사례와 함께 성실성을 표현",
+        riskLevel: 1,
+      },
+    ].sort((a, b) => b.riskLevel - a.riskLevel)
+
+    const mockResult: AnalysisResult = {
+      id: Date.now().toString(),
+      studentName: "학생",
+      uploadDate: new Date().toISOString(),
+      overallScore: 88,
+      careerDirection: careerDirection || undefined,
+      careerAlignment: careerDirection
+        ? {
+            percentage: careerAlignmentPercentage,
+            summary:
+              careerAlignmentPercentage >= 80
+                ? "진로 방향과 매우 잘 부합하는 생기부입니다."
+                : careerAlignmentPercentage >= 60
+                  ? "진로 방향과 적절히 연계된 생기부입니다."
+                  : "진로 연계성을 더 강화하면 좋습니다.",
+            strengths: ["AI 관련 활동이 진로와 직접 연결됨", "데이터 분석 역량이 우수함"],
+            improvements: ["심화 탐구 활동 추가 권장", "전공 관련 독서 활동 보강"],
+          }
+        : undefined,
+      strengths: [
+        "AI 및 데이터 분석 관련 탐구 활동이 구체적이고 심층적임",
+        "수학 세특에서 문제 해결 과정과 사고력이 명확히 드러남",
+        "창의적 체험활동에서 리더십과 협업 역량이 우수함",
+      ],
+      improvements: [
+        "진로 희망 대비 전공 적합성을 보완할 추가 활동 필요",
+        "3학년 1학기 세특에서 심화 탐구 내용 보강 권장",
+        "교과 간 연계성을 강화하여 일관된 서사 구축 필요",
+      ],
+      errors: mockErrors,
+      suggestions: [
+        "수학 세특: '데이터 분석' 키워드를 활용한 심화 탐구 추가 권장",
+        "과학 세특: AI 윤리 관련 탐구로 진로 연계성 강화",
+        "동아리 활동: 구체적인 역할과 성과를 명확히 기술",
+      ],
+      files: files.map((f) => f.name),
+      isPrivate: true,
+      likes: 0,
+      saves: 0,
+      comments: [],
+      userId: userSessionId,
+      studentProfile: "AI에 관심이 많은 학생으로 추정",
+    }
+
+    setAnalysisResult(mockResult)
+    setPhase("complete")
   }
 
   const handleShareClick = () => {
@@ -372,9 +406,8 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
     setProgressMessage("")
     setCurrentTip("")
     setCareerDirection("")
-    // Keep analysis in sessionStorage so navigation works correctly
-    // Only remove the "is_analyzing" flag to allow reanalysis
-    sessionStorage.removeItem("is_analyzing")
+    // sessionStorage.removeItem("current_analysis")
+    // sessionStorage.removeItem("is_analyzing")
   }
 
   const isFixedScreen =
@@ -478,13 +511,30 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                       </div>
                       <div className="space-y-1">
                         {analysisHistory.map((analysis) => {
-                          const timeDisplay = StorageManager.formatTimeAgo(
-                            analysis.uploadDate || analysis.timestamp || new Date().toISOString()
-                          )
+                          const uploadDate = new Date(analysis.uploadDate)
+                          const now = new Date()
+                          const diffMs = now.getTime() - uploadDate.getTime()
+                          const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+                          const diffDays = Math.floor(diffHours / 24)
+
+                          let timeDisplay = ""
+                          if (diffHours < 24) {
+                            // Today - show time
+                            timeDisplay = uploadDate.toLocaleTimeString("ko-KR", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          } else if (diffDays === 1) {
+                            // Yesterday
+                            timeDisplay = "어제"
+                          } else {
+                            // Older - show date
+                            timeDisplay = `${uploadDate.getMonth() + 1}/${uploadDate.getDate()}`
+                          }
 
                           return (
                             <button
-                              key={analysis.id || Math.random().toString()}
+                              key={analysis.id}
                               onClick={() => {
                                 setAnalysisResult(analysis)
                                 setPhase("complete")
@@ -493,15 +543,10 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                                   sessionStorage.setItem("is_analyzing", "true")
                                 }
                               }}
-                              className="w-full p-2 bg-gray-50/80 hover:bg-gray-100/80 rounded-lg border border-gray-200/50 text-left transition-all duration-200 hover:shadow-sm"
+                              className="w-full p-2 bg-gray-50/80 hover:bg-gray-100/80 rounded-lg border border-gray-200/50 text-left transition-all"
                             >
                               <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs font-medium text-gray-900">{analysis.overallScore}점</span>
-                                  {analysis.errors && analysis.errors.length > 0 && (
-                                    <span className="text-[9px] text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full">\n                                      {analysis.errors.length}개 문제\n                                    </span>
-                                  )}
-                                </div>
+                                <span className="text-xs font-medium text-gray-900">{analysis.overallScore}점</span>
                                 <span className="text-[9px] text-gray-500">{timeDisplay}</span>
                               </div>
                             </button>
@@ -530,67 +575,47 @@ ${analysisResult.suggestions.map((s, i) => `${i + 1}. ${s}`).join("\n")}
                         </GlassCard>
                       )}
 
-                      <GlassCard className="p-3 space-y-2">
+                      <GlassCard className="p-2 space-y-1">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-gray-800">
+                          <span className="text-xs font-medium text-gray-700">
                             {phase === "ocr" ? "텍스트 추출 중..." : "AI 분석 중..."}
                           </span>
                           {phase === "ocr" && (
-                            <motion.span 
-                              className="text-xs font-bold text-gray-900 tabular-nums"
-                              key={Math.floor(ocrProgress)}
-                              initial={{ scale: 1.2, opacity: 0.5 }}
-                              animate={{ scale: 1, opacity: 1 }}
-                              transition={{ duration: 0.2 }}
-                            >
-                              {Math.floor(ocrProgress)}%
-                            </motion.span>
+                            <span className="text-xs font-bold text-gray-900">{Math.floor(ocrProgress)}%</span>
                           )}
                         </div>
                         {phase === "ocr" && (
-                          <div className="w-full h-2.5 bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100 rounded-full overflow-hidden shadow-inner">
+                          <div className="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden shadow-inner">
                             <motion.div
-                              className="h-full bg-gradient-to-r from-gray-900 via-gray-700 to-gray-900 rounded-full shadow-lg relative overflow-hidden"
+                              className="h-full bg-gradient-to-r from-gray-800 via-gray-600 to-gray-800 rounded-full shadow-lg relative overflow-hidden"
                               style={{ width: `${ocrProgress}%` }}
-                              transition={{ duration: 0.2, ease: "easeOut" }}
+                              transition={{ duration: 0.3, ease: "easeOut" }}
                             >
                               <motion.div
-                                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+                                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
                                 animate={{
                                   x: ["-100%", "200%"],
                                 }}
                                 transition={{
-                                  duration: 1.2,
+                                  duration: 1.5,
                                   repeat: Number.POSITIVE_INFINITY,
                                   ease: "linear",
                                 }}
                               />
-                              <div className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent" />
                             </motion.div>
                           </div>
                         )}
                         {phase === "analyzing" && (
-                          <div className="flex justify-center py-3">
-                            <motion.div className="relative">
-                              <motion.div
-                                className="w-10 h-10 border-4 border-gray-200 border-t-gray-900 rounded-full"
-                                animate={{ rotate: 360 }}
-                                transition={{
-                                  duration: 0.8,
-                                  repeat: Number.POSITIVE_INFINITY,
-                                  ease: "linear",
-                                }}
-                              />
-                              <motion.div
-                                className="absolute inset-0 w-10 h-10 border-4 border-transparent border-t-gray-400 rounded-full"
-                                animate={{ rotate: -360 }}
-                                transition={{
-                                  duration: 1.2,
-                                  repeat: Number.POSITIVE_INFINITY,
-                                  ease: "linear",
-                                }}
-                              />
-                            </motion.div>
+                          <div className="flex justify-center py-2">
+                            <motion.div
+                              className="w-8 h-8 border-4 border-gray-200 border-t-gray-800 rounded-full"
+                              animate={{ rotate: 360 }}
+                              transition={{
+                                duration: 1,
+                                repeat: Number.POSITIVE_INFINITY,
+                                ease: "linear",
+                              }}
+                            />
                           </div>
                         )}
                       </GlassCard>

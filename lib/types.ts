@@ -39,48 +39,23 @@ export interface UserInteraction {
 }
 
 export interface AnalysisResult {
-  id?: string
-  studentName?: string
-  uploadDate?: string
+  id: string
+  studentName: string
+  uploadDate: string
   overallScore: number
-  careerDirection?: string
-  careerAlignment?: CareerAlignment
-  strengths?: Array<{
-    title: string
-    description: string
-    utilization?: string
-  }>
-  improvements?: string[]
-  errors: Array<{
-    id: string
-    title: string
-    severity: 'high' | 'medium' | 'low'
-    description: string
-    location: string
-    suggestion: string
-    category: string
-  }>
-  recommendations?: Array<{
-    priority: string
-    item: string
-    action?: string
-  }>
-  summary?: {
-    overall: string
-    keyPoints: string[]
-  }
-  suggestions?: string[]
-  files?: string[]
-  likes?: number
-  saves?: number
-  comments?: Comment[]
-  userId?: string
+  careerDirection?: string // Add career direction field
+  careerAlignment?: CareerAlignment // Add career alignment analysis
+  strengths: string[]
+  improvements: string[]
+  errors: ErrorItem[]
+  suggestions: string[]
+  files: string[]
+  likes: number
+  saves: number
+  comments: Comment[]
+  userId: string
   isPrivate?: boolean
   aiKillerResult?: AIKillerResult
-  timestamp?: string
-  studentInfo?: {
-    careerDirection?: string
-  }
 }
 
 export interface CareerAlignment {
