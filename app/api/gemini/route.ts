@@ -1,13 +1,18 @@
 import { type NextRequest, NextResponse } from "next/server"
 
-const GEMINI_API_KEY = "AIzaSyCYhOWMK6LWl4Qm-8Uth4XF6eWfUPOh6I0"
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY
 
 export async function POST(request: NextRequest) {
   try {
     const { prompt, task } = await request.json()
 
+    if (!GEMINI_API_KEY) {
+      console.error("[v0] Missing GEMINI_API_KEY environment variable")
+      return NextResponse.json({ error: "서버에 Gemini API 키가 설정되지 않았습니다." }, { status: 500 })
+    }
+
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: {
@@ -25,6 +30,8 @@ export async function POST(request: NextRequest) {
           ],
           generationConfig: {
             temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
             maxOutputTokens: task === "name" ? 50 : task === "description" ? 200 : 1000,
           },
         }),
